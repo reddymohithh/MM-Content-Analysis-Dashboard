@@ -629,4 +629,29 @@ synthetic seed — moved to a background shell rather than blocking on it.
 **GitHub repo pushed.** User created `MM-Content-Analysis-Dashboard` (public)
 under GitHub username `reddymohithh` via the web UI. Added it as the `origin`
 remote, renamed the local branch to `main`, and pushed both commits
-(`git push -u origin main`) — succeeded on the first attempt.
+(`git push -u origin main`) — succeeded on the first attempt, reusing a
+GitHub credential already cached in the machine's Keychain from an earlier,
+unrelated project (explained to the user when they asked why no new token
+was needed, and the tradeoffs of reusing one token across projects vs.
+minting a scoped one per project — left as their call, not acted on further
+this session).
+
+**Real sync verified, one real bug found and fixed.** First `seed:beehiiv`
+run against `local-real` completed (31 editions, real per-edition poll
+tallies via the "Curated Content Feedback" poll) but the browser check
+immediately after showed absurd numbers: 2893% open rate, 79% CTR. Root
+cause: Beehiiv's post-stats `open_rate`/`click_rate` fields are already
+plain percentages (confirmed by inspecting a raw API response directly,
+e.g. `"open_rate": 46.15` meaning 46.15%), but the script treated them as
+0-1 fractions and multiplied by 100, inflating everything roughly 100x.
+Fixed in `scripts/seed-from-beehiiv.ts` (removed the erroneous
+multiplication, added a comment recording the confirmed field convention so
+it doesn't get "fixed" back incorrectly later) and re-ran the sync
+(`onConflictDoUpdate` made this a clean idempotent re-sync, no duplicate
+rows). Re-verified in the browser: 28.94% open rate / 0.79% CTR trailing
+averages, individual editions in the expected 17-33% open / 0.6-1.3% CTR
+range, a real edition detail page (Coca-Cola rebrand) showing a real 4-
+response poll tally, real ranked top links with real click counts, and an
+edition with only 13 recipients (evidently a test/low-volume send) correctly
+showing 0%/0% rather than erroring — all against the live Beehiiv-sourced
+`local-real` Neon branch, not synthetic data.

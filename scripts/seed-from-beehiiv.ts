@@ -106,8 +106,12 @@ async function main() {
       continue;
     }
 
-    const openRate = Math.round(emailStats.open_rate * 10000) / 100; // fraction -> percent
-    const ctrRaw = Math.round(emailStats.click_rate * 10000) / 100;
+    // Beehiiv's post-stats `open_rate`/`click_rate` fields are already plain
+    // percentages (e.g. 28.93 means 28.93%), confirmed by inspecting a real
+    // response during this build — not fractions of 1, despite that being a
+    // more common API convention. Do not re-multiply by 100 here.
+    const openRate = Math.round(emailStats.open_rate * 100) / 100;
+    const ctrRaw = Math.round(emailStats.click_rate * 100) / 100;
     const ctrVerified = emailStats.delivered
       ? Math.round((emailStats.unique_verified_clicks / emailStats.delivered) * 10000) / 100
       : 0;
