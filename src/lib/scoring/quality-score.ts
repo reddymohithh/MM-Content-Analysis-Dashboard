@@ -1,0 +1,181 @@
+/**
+ * Content quality score, ported verbatim (formula and copy) from the final,
+ * punch-list-fixed wireframe (`computeQuality` in the standalone HTML file,
+ * see BUILD_LOG.md), not the earlier version in the old project skeleton.
+ *
+ * The user's explicit instruction: depend less on poll response, since many
+ * editions get zero poll responses and a poll-heavy score would unfairly
+ * penalize (or, via a neutral default, flatter) those editions. When a poll
+ * has responses, it only carries 20% of the total (down from an initial 35%);
+ * when it doesn't, that weight is redistributed proportionally across the
+ * other three components rather than defaulting to a neutral placeholder.
+ */
+
+export interface QualityScoreInput {
+  id: string;
+  ctrOverall: number; // percent, e.g. 0.79
+  unsubRate: number; // percent, e.g. 0.04
+  trailingAvgCtr: number;
+  trailingAvgUnsub: number;
+  poll: {
+    total: number;
+    lovedIt: number;
+    prettyUseful: number;
+  } | null;
+  voice?: {
+    avgSentenceLength: number;
+    bannedPhraseHits: number;
+    /** false until a real text-analysis pass replaces this placeholder */
+    computed: boolean;
+  };
+}
+
+export interface QualityScoreComponent {
+  key: "sat" | "eng" | "ret" | "voice";
+  name: string;
+  weight: number; // 0-1
+  score: number; // 0-100
+  weightLabel: string; // e.g. "20% wt"
+  dashArrayFraction: number; // 0-1, for the donut progress arc
+  raw: string;
+  benchmark: string;
+  why: string;
+}
+
+export interface QualityScoreResult {
+  total: number;
+  hasPoll: boolean;
+  narrative: string;
+  components: QualityScoreComponent[];
+}
+
+const DEFAULT_VOICE = { avgSentenceLength: 18, bannedPhraseHits: 0, computed: false };
+
+export function computeQualityScore(input: QualityScoreInput): QualityScoreResult {
+  const hasPoll = !!input.poll && input.poll.total > 0;
+  const voice = input.voice ?? DEFAULT_VOICE;
+
+  const satisfactionScore = hasPoll
+    ? Math.round(((input.poll!.lovedIt + input.poll!.prettyUseful) / input.poll!.total) * 100)
+    : null;
+
+  const engagementScore = Math.min(
+    100,
+    Math.round((input.ctrOverall / input.trailingAvgCtr) * 70),
+  );
+
+  const retentionScore =
+    input.unsubRate > 0
+      ? Math.min(100, Math.round((input.trailingAvgUnsub / input.unsubRate) * 70))
+      : 100;
+
+  let voiceScore = 100;
+  if (voice.avgSentenceLength > 20) {
+    voiceScore -= Math.min(40, (voice.avgSentenceLength - 20) * 4);
+  }
+  voiceScore -= Math.min(60, voice.bannedPhraseHits * 15);
+  voiceScore = Math.max(0, Math.round(voiceScore));
+
+  const weights = hasPoll
+    ? { sat: 0.2, eng: 0.35, ret: 0.25, voice: 0.2 }
+    : { sat: 0, eng: 0.4375, ret: 0.3125, voice: 0.25 };
+
+  type RawPart = {
+    key: QualityScoreComponent["key"];
+    name: string;
+    weight: number;
+    score: number;
+    raw: string;
+    benchmark: string;
+  };
+
+  const parts: RawPart[] = [];
+  if (hasPoll) {
+    parts.push({
+      key: "sat",
+      name: "Reader satisfaction (poll)",
+      weight: weights.sat,
+      score: satisfactionScore!,
+      raw: `${input.poll!.total} responses, ${satisfactionScore}% positive`,
+      benchmark:
+        "Only counted when a poll has responses; excluded otherwise so quiet posts aren't penalized.",
+    });
+  }
+  parts.push({
+    key: "eng",
+    name: "Engagement depth",
+    weight: weights.eng,
+    score: engagementScore,
+    raw: `Overall CTR ${input.ctrOverall}%`,
+    benchmark: `Trailing-window average overall CTR: ${round2(input.trailingAvgCtr)}%`,
+  });
+  parts.push({
+    key: "ret",
+    name: "Retention signal",
+    weight: weights.ret,
+    score: retentionScore,
+    raw: `Unsubscribe rate ${input.unsubRate}%`,
+    benchmark: `Trailing-window average unsubscribe rate: ${round2(input.trailingAvgUnsub)}%`,
+  });
+  parts.push({
+    key: "voice",
+    name: "Writing and voice compliance",
+    weight: weights.voice,
+    score: voiceScore,
+    raw: voice.computed
+      ? `Average sentence length ${voice.avgSentenceLength} words; ${voice.bannedPhraseHits} banned-phrase hit(s)`
+      : "Automated sentence-length and banned-phrase check (placeholder pending real text analysis, see BUILD_LOG.md)",
+    benchmark: "Target: sentences under 20 words, zero banned-phrase hits",
+  });
+
+  const total = Math.round(parts.reduce((sum, c) => sum + c.score * c.weight, 0));
+
+  let best = parts[0];
+  let worst = parts[0];
+  for (const c of parts) {
+    const points = c.score * c.weight;
+    if (points > best.score * best.weight) best = c;
+    if (points < worst.score * worst.weight) worst = c;
+  }
+
+  const narrative = hasPoll
+    ? `This edition scored ${total}%, weighted mostly on engagement and retention with a smaller poll component. The biggest positive driver was ${best.name.toLowerCase()}. The biggest drag was ${worst.name.toLowerCase()}.`
+    : `This edition scored ${total}%. No poll responses came in, so the score leans fully on engagement, retention, and voice rather than reader ratings.`;
+
+  const components: QualityScoreComponent[] = parts.map((c) => ({
+    key: c.key,
+    name: c.name,
+    weight: c.weight,
+    score: c.score,
+    weightLabel: `${Math.round(c.weight * 100)}% wt`,
+    dashArrayFraction: c.score / 100,
+    raw: c.raw,
+    benchmark: c.benchmark,
+    why: whyFor(c.key, c.score),
+  }));
+
+  return { total, hasPoll, narrative, components };
+}
+
+function whyFor(key: QualityScoreComponent["key"], score: number): string {
+  switch (key) {
+    case "sat":
+      return score >= 65
+        ? "Readers leaned positive on this send."
+        : "Not-helpful votes outweighed the usual share this send.";
+    case "eng":
+      return score >= 70
+        ? "Readers clicked through at or above the recent normal."
+        : "Click-through lagged the recent normal on this send.";
+    case "ret":
+      return score >= 70
+        ? "Almost nobody left after this send, a good sign even if other numbers dipped."
+        : "Unsubscribe rate ran a bit hotter than the recent normal.";
+    default:
+      return "Sentence length and banned-phrase checks ran automatically against the locked voice spec.";
+  }
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}

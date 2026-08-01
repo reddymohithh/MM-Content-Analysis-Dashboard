@@ -1,36 +1,93 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Marketing Monk — Content Analysis Dashboard
 
-## Getting Started
+A content-analysis dashboard for the Marketing Monk (AI Marketing Brief) daily
+Beehiiv newsletter: real open-rate/CTR trends, a per-edition content quality
+score, an editorial Batch 1 / Batch 2 audience lens, a Subject Line Lab, and
+retention tracking.
 
-First, run the development server:
+Built with Next.js (App Router, TypeScript, Tailwind), Neon Postgres (via
+Drizzle ORM), and the Beehiiv REST API v2, deployed on Vercel.
+
+The full build process — every decision, every question asked and answered,
+word for word — is logged in [`BUILD_LOG.md`](./BUILD_LOG.md).
+
+## Stack
+
+- **Framework:** Next.js 16 (App Router, TypeScript, Tailwind v4)
+- **Database:** [Neon](https://neon.tech) Postgres, via [Drizzle ORM](https://orm.drizzle.team)
+- **Data source:** [Beehiiv REST API v2](https://developers.beehiiv.com)
+- **Hosting:** [Vercel](https://vercel.com)
+- **Access control:** single shared-password gate (`src/proxy.ts`)
+
+## What's real vs. placeholder
+
+This is transparent by design (see `BUILD_LOG.md` for the full reasoning):
+
+- **Real:** open rate, CTR, unsubscribe rate, per-edition poll tallies (walked
+  live from Beehiiv's `/polls/:id/responses?post_id=` endpoint), top-link
+  click counts, subject-line character length/emoji/number detection.
+- **Placeholder, clearly labeled in the UI and code:** writing/voice-
+  compliance scoring (assumes clean until a real text-analysis pass is
+  wired up), subject-line hook-type classification (rule-based heuristic,
+  not NLP/LLM), and the Batch 1/Batch 2 audience-fit commentary (template
+  selection over real numbers, not a generated judgment). All three are
+  scoped as documented follow-ups, not silently faked.
+- **Public deployment:** runs on a realistic-but-synthetic 16-edition demo
+  dataset (`src/lib/synthetic-data.ts`), never real Marketing Monk
+  performance numbers. Real data, if synced, stays in a private Neon branch
+  and local `.env.local` only — see "Data sources" below.
+
+## Local development
 
 ```bash
+npm install
+cp .env.example .env.local
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). With `DATABASE_URL`
+unset, the app automatically falls back to the bundled synthetic dataset, so
+it's fully browsable with zero setup.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Data sources
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Two independent Neon branches are meant to back this project:
 
-## Learn More
+1. **Public/demo branch** — seeded with synthetic data, backs the deployed
+   Vercel app. Seed it with:
+   ```bash
+   npm run seed:synthetic
+   ```
+2. **Private/local branch** — seeded with real Beehiiv data for personal use
+   only, never deployed publicly. Requires `BEEHIIV_API_KEY` in
+   `.env.local`:
+   ```bash
+   npm run seed:beehiiv
+   ```
 
-To learn more about Next.js, take a look at the following resources:
+Point `DATABASE_URL` in `.env.local` at whichever branch you're working
+against before running a seed script.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Database
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run db:generate   # diff schema -> SQL migration (offline, no DB needed)
+npm run db:push        # apply schema to DATABASE_URL
+npm run db:studio      # browse the DB
+```
 
-## Deploy on Vercel
+## Environment variables
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+See [`.env.example`](./.env.example) for the full list and where to get each
+value (`DATABASE_URL`, `BEEHIIV_API_KEY`, `BEEHIIV_PUBLICATION_ID`,
+`SITE_PASSWORD`).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Deploying
+
+1. Push to GitHub.
+2. Import the repo in Vercel.
+3. Set `DATABASE_URL` (public/demo Neon branch), `SITE_PASSWORD`, and
+   optionally `BEEHIIV_PUBLICATION_ID` in the Vercel project's environment
+   variables. Do not set `BEEHIIV_API_KEY` on the public deployment.
+4. Run `npm run seed:synthetic` against the demo branch before or after first
+   deploy.
