@@ -4,6 +4,8 @@ import { computeHookTypeAverages, type InsightEdition } from "@/lib/scoring/insi
 import { HOOK_TYPE_LABELS } from "@/lib/scoring/subject-line";
 import { PageTitle, Card, Eyebrow, DataTable } from "@/components/dashboard/ui";
 
+export const dynamic = "force-dynamic";
+
 export default async function SubjectLineLabPage() {
   const editions = await getAllEditions();
 

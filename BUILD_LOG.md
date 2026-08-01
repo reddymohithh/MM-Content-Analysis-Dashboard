@@ -581,13 +581,6 @@ unprompted, the plan is: the user creates the empty repo themselves via
 GitHub's web UI (fastest path, no local tooling needed), then this session
 adds it as the `origin` remote and pushes the existing local commits.
 
-**Vercel deployment: same shape of blocker.** `npx vercel` itself installs
-and runs fine (auto-installed via npx, no Homebrew needed), but deploying
-still requires the user's own Vercel account authentication, which is an
-interactive browser login this session cannot complete on the user's behalf.
-Plan: give the user the exact steps (import the GitHub repo in the Vercel
-dashboard, set env vars, deploy) once the repo exists on GitHub.
-
 ## Round 3: real Beehiiv key verified, second Neon branch, GitHub pushed
 
 The user pasted what they again labeled as the API key but which was still
@@ -655,3 +648,66 @@ response poll tally, real ranked top links with real click counts, and an
 edition with only 13 recipients (evidently a test/low-volume send) correctly
 showing 0%/0% rather than erroring — all against the live Beehiiv-sourced
 `local-real` Neon branch, not synthetic data.
+
+## Round 4: git-credential question, Vercel import, and a real build bug
+
+While the corrected `seed:beehiiv` ran in the background, the user asked why
+pushing to the new repo hadn't required creating a new GitHub token, given
+they'd previously made separate tokens per project ("digital library push",
+"mba-prep push"). Explained that GitHub tokens are scoped by *permission*
+(`repo` = access to everything owned by the account), not by project, and
+that the push had silently reused whichever token was already cached in the
+Mac's Keychain from an earlier project. Walked through the real trade-offs
+of that (shared blast radius if the token leaks, shared expiration date,
+shared revocation) without recommending a specific action. The user then
+asked whether they should create a dedicated token for this repo; suggested
+a fine-grained token scoped to just this repository as the better version of
+that idea (true per-project isolation, unlike another classic token), gave
+the exact GitHub steps, and left it as the user's call — not acted on further
+this session, no new token was created.
+
+**Vercel import didn't show the new repo.** The user's Vercel "Import Git
+Repository" screen only listed an older project (`digital-library-dashboard`)
+— Vercel's GitHub App only sees repos it's been explicitly granted access to,
+and a newly created repo isn't added automatically. Directed the user to
+"Adjust GitHub App Permissions" and grant access to
+`MM-Content-Analysis-Dashboard` specifically (or all repos), after which the
+import screen picked it up.
+
+**SITE_PASSWORD chosen, deliberately not logged here.** The user picked a
+password for the deployed gate. Recorded that a password was set and where
+(Vercel env vars, `.env.local`), but not committed its literal value into
+this file — `BUILD_LOG.md` is pushed to the public repo, so writing the real
+gate password into it would defeat the entire point of having a gate. This is
+one place the "log everything" instruction is deliberately overridden by not
+publishing a live secret to a public file; the value itself lives only in
+Vercel's dashboard and the user's local `.env.local`.
+
+**Vercel build failed: a real, previously-undetected bug.** With the repo
+importable and all three env vars set (`DATABASE_URL` pointed at the
+`production`/synthetic branch, `SITE_PASSWORD`, `BEEHIIV_PUBLICATION_ID`),
+the Vercel build failed with `NeonDbError: Error connecting to database:
+TypeError: Cannot convert argument to a ByteString`, thrown while
+prerendering `/editions`. Root cause: Next.js's App Router statically
+prerenders any page that doesn't use a dynamic API at build time by default,
+and none of `/overview`, `/editions`, `/editions/[id]`, `/subject-line-lab`,
+or `/retention` used one — so all five were being data-fetched from Neon
+*during the Vercel build step itself* (confirmed locally: the build's route
+table showed `○ Static` for all of them, a detail missed during local
+verification earlier since local builds had a working `DATABASE_URL`
+available and never surfaced this). A build server failing to reach the
+database, or an env var not yet fully propagated to that specific build
+phase, is a real failure mode Vercel's build environment can hit that a
+normal request-time serverless function wouldn't.
+
+Fixed by adding `export const dynamic = "force-dynamic"` to all five pages,
+so they render fresh from the database on every request instead of once at
+build time — the architecturally correct choice regardless of the bug, since
+edition data changes independently of deploys and shouldn't be cached at the
+page level anyway. Verified locally two ways: the build's route table now
+shows `ƒ Dynamic` for all five, and a full `npm run build` was run with
+`.env.local` moved aside entirely (zero DB-related env vars present at all)
+to directly simulate Vercel's build conditions — it still compiled and
+succeeded, proving the build no longer touches the database under any
+circumstance. Pushed to GitHub; Vercel redeploys automatically on push to
+`main`.

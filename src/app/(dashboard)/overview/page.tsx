@@ -9,6 +9,12 @@ import {
 import { PageTitle, StatCard, GradientStatCard, Card, Eyebrow } from "@/components/dashboard/ui";
 import { OverviewChart } from "@/components/dashboard/OverviewChart";
 
+// Reads live from the database on every request rather than being
+// statically prerendered at build time — Vercel's build step shouldn't
+// depend on database reachability, and edition data changes independently
+// of deploys anyway.
+export const dynamic = "force-dynamic";
+
 export default async function OverviewPage() {
   const [editions, publication] = await Promise.all([
     getAllEditions(),

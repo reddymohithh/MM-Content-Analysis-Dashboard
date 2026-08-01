@@ -4,6 +4,8 @@ import { computeQualityScore } from "@/lib/scoring/quality-score";
 import { usDate } from "@/lib/format";
 import { PageTitle, DataTable } from "@/components/dashboard/ui";
 
+export const dynamic = "force-dynamic";
+
 export default async function EditionsListPage() {
   const editions = await getAllEditions();
   const { avgCtr, avgUnsub } = trailingAverages(editions);

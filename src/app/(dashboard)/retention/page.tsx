@@ -3,6 +3,8 @@ import { getAllEditions, getPublicationSnapshot, trailingAverages } from "@/lib/
 import { usDate, round2 } from "@/lib/format";
 import { PageTitle, StatCard, Card, DataTable } from "@/components/dashboard/ui";
 
+export const dynamic = "force-dynamic";
+
 export default async function RetentionPage() {
   const [editions, publication] = await Promise.all([getAllEditions(), getPublicationSnapshot()]);
   const { avgUnsub, avgSpam } = trailingAverages(editions);

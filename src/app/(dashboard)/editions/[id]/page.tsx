@@ -8,6 +8,8 @@ import { StatCard, GradientStatCard, Card, Eyebrow, EmptyState } from "@/compone
 import { PollChart } from "@/components/dashboard/PollChart";
 import { QualityDonuts } from "@/components/dashboard/QualityDonuts";
 
+export const dynamic = "force-dynamic";
+
 export default async function EditionDetailPage({
   params,
   searchParams,
