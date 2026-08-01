@@ -11,8 +11,8 @@
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "seed:synthetic": "tsx scripts/seed-synthetic.ts",
-    "seed:beehiiv": "tsx scripts/seed-from-beehiiv.ts"
+    "seed:synthetic": "tsx --env-file=.env.local scripts/seed-synthetic.ts",
+    "seed:beehiiv": "tsx --env-file=.env.local scripts/seed-from-beehiiv.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

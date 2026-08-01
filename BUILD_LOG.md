@@ -509,9 +509,81 @@ covering the stack, what's real vs. placeholder (stated plainly, matching the
 project's own "never fabricate a number" rule turned inward on the build
 itself), local dev, the two-Neon-branch data strategy, and deploy steps.
 
+## Local commit
+
+Made one local commit (`08ce1d9`, "Build Marketing Monk content analysis
+dashboard on Next.js + Neon + Beehiiv") covering the full build above. Git
+had no configured user identity on this machine, so it auto-filled one from
+the OS username/hostname (`Reddy Mohith <reddymohith@Mac.lan>`) — flagged to
+the user before pushing anywhere public, since that email isn't real. Nothing
+was pushed to GitHub yet; creating/pushing to a public remote is treated as an
+action needing explicit confirmation, not something to do unprompted.
+
 ## Outstanding, waiting on the user
 
-1. Neon connection string (for `DATABASE_URL` in `.env.local`, both branches).
-2. Beehiiv API key (for `scripts/seed-from-beehiiv.ts`).
-3. Confirmation to create the public GitHub repo and push (name/visibility).
+1. ~~Neon connection string~~ — provided and wired up, see below.
+2. Beehiiv API key (for `scripts/seed-from-beehiiv.ts`) — still needed, see
+   below.
+3. ~~Confirmation to create the public GitHub repo~~ — confirmed (name
+   "MM Content Analysis Dashboard", public, GitHub username "Reddymohithh"),
+   blocked on tooling, see below.
 4. A real `SITE_PASSWORD` for the deployed gate (currently unset).
+
+## Round 2: real Neon connected, GitHub push blocked on missing tooling
+
+The user provided a Neon connection string, a GitHub repo name/visibility/
+username, and asked to use their GitHub noreply email for commits.
+
+**Neon wired up and verified live.** `DATABASE_URL` set in `.env.local`.
+`npm run db:push` applied the schema to the real database (Drizzle's Neon
+websocket driver, took a few seconds to connect but succeeded). `npm run
+seed:synthetic` seeded all 16 demo editions into it successfully.
+
+**Bug found and fixed during this step:** both seed scripts called
+`config({ path: ".env.local" })` from the `dotenv` package *after* their own
+`import { db } from "../src/lib/db"` line in source order, but ES module
+`import` statements are hoisted and execute before any other top-level code
+in the file, so `.env.local` was never actually loaded before `lib/db`
+read `process.env.DATABASE_URL` and threw. Fixed by dropping the in-script
+`dotenv` calls entirely and using Node's native `--env-file=.env.local` flag
+on the `tsx` invocation in `package.json` instead, which loads the file
+before the module graph executes at all. Re-verified both `db:push` and
+`seed:synthetic` end to end after the fix, and re-confirmed the app reads
+correctly from the real Neon database (not the synthetic in-memory fallback)
+via the browser preview.
+
+**Beehiiv API key: not actually provided yet.** The user's message labeled a
+value "Beehiiv API" but it was `pub_a5a04dd9-d851-4864-bf87-7a105c812c27` —
+that's the **publication ID**, already known and already set as
+`BEEHIIV_PUBLICATION_ID` since the start of this build, not an API key. Real
+API keys from Beehiiv (Settings -> Integrations -> API) look different and
+are a separate value. Flagged back to the user rather than guessing or
+silently treating the publication ID as a working key; `scripts/seed-from-
+beehiiv.ts` has not been run.
+
+**Git identity fixed before any push.** Set `git config user.name
+"Reddymohithh"` and `user.email "Reddymohithh@users.noreply.github.com"`
+locally for this repo only (not global), then `git commit --amend
+--reset-author` on the sole existing local commit, since nothing had been
+pushed anywhere yet and there was no reason to carry a machine-generated
+placeholder identity into the first commit of a portfolio repo. Noted to the
+user that GitHub's exact noreply-email format depends on their account
+settings (Settings -> Emails) and may need correcting if this guessed format
+doesn't attribute correctly once pushed.
+
+**GitHub repo creation and push: blocked on missing tooling, not on
+permission.** Neither the `gh` CLI nor Homebrew is installed in this
+environment, and creating a GitHub repo requires either `gh` (authenticated)
+or a personal access token against the GitHub API — the user hasn't been
+asked for a token, and browser-based `gh auth login` isn't something this
+session can complete unattended anyway. Rather than ask for a GitHub PAT
+unprompted, the plan is: the user creates the empty repo themselves via
+GitHub's web UI (fastest path, no local tooling needed), then this session
+adds it as the `origin` remote and pushes the existing local commits.
+
+**Vercel deployment: same shape of blocker.** `npx vercel` itself installs
+and runs fine (auto-installed via npx, no Homebrew needed), but deploying
+still requires the user's own Vercel account authentication, which is an
+interactive browser login this session cannot complete on the user's behalf.
+Plan: give the user the exact steps (import the GitHub repo in the Vercel
+dashboard, set env vars, deploy) once the repo exists on GitHub.

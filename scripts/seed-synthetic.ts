@@ -5,12 +5,9 @@
  * see BUILD_LOG.md "public vs. real data split".
  *
  * Run: npm run seed:synthetic
- * (reads DATABASE_URL from .env.local — point it at the demo branch first)
+ * (reads DATABASE_URL from .env.local via Node's --env-file flag, wired up
+ * in package.json — point it at the demo branch first)
  */
-import "dotenv/config";
-import { config } from "dotenv";
-config({ path: ".env.local", override: true });
-
 import { db } from "../src/lib/db";
 import {
   editions,

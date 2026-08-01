@@ -7,11 +7,9 @@
  * Requires BEEHIIV_API_KEY and BEEHIIV_PUBLICATION_ID in .env.local.
  *
  * Run: npm run seed:beehiiv
+ * (reads env vars from .env.local via Node's --env-file flag, wired up in
+ * package.json)
  */
-import "dotenv/config";
-import { config } from "dotenv";
-config({ path: ".env.local", override: true });
-
 import { eq } from "drizzle-orm";
 import { db } from "../src/lib/db";
 import {
