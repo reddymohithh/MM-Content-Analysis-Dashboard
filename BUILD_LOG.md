@@ -587,3 +587,46 @@ still requires the user's own Vercel account authentication, which is an
 interactive browser login this session cannot complete on the user's behalf.
 Plan: give the user the exact steps (import the GitHub repo in the Vercel
 dashboard, set env vars, deploy) once the repo exists on GitHub.
+
+## Round 3: real Beehiiv key verified, second Neon branch, GitHub pushed
+
+The user pasted what they again labeled as the API key but which was still
+the publication ID minus its `pub_` prefix; flagged again with exact
+navigation steps (Beehiiv -> workspace/profile -> Settings -> Integrations ->
+API -> Generate/copy API Key). The next message contained a real-looking key.
+Verified it directly with a throwaway `fetch` against
+`GET /publications/:id?expand[]=stats` (no DB writes) before trusting it:
+returned real live data (Marketing Monk, Moonshot Technologies,
+56,818 active subscribers, 30.97% avg open rate) with a 200, confirmed valid.
+Temp test file deleted immediately after.
+
+**Data-separation problem caught before writing anything.** The single Neon
+database connected so far already held the seeded synthetic demo dataset and
+was implicitly "the" database — running the real-data sync into it would have
+mixed real Marketing Monk numbers into what's supposed to be the public
+deployment's synthetic-only data source, directly against the earlier
+"public vs. real data split" decision. Flagged this to the user before
+proceeding rather than after.
+
+**Second Neon branch created.** Renamed the mental model explicitly: the
+existing branch is `production` (synthetic demo data, backs the public Vercel
+deployment via its own env vars, never touched by the Beehiiv sync); a new
+`local-real` branch was created off it, using Neon's "branch schema only"
+option (copies table structure without the 16 synthetic rows) and with
+auto-delete changed from the console's 1-day default to Never, since this is
+a persistent local-use branch, not a throwaway. `.env.local`'s `DATABASE_URL`
+now points at `local-real`; the `production` connection string is kept as a
+comment in that same file for reference when setting Vercel's env vars later
+(the file is git-ignored either way). `db:push` against `local-real` reported
+"No changes detected", confirming the branch-schema-only copy already matched.
+
+**Real sync running.** `npm run seed:beehiiv` kicked off against `local-real`
+with the verified key. It walks every recent post's stats plus, per post,
+every page of the recurring feedback poll's responses filtered to that post
+(`computeEditionPollTally`), so it runs considerably longer than the
+synthetic seed — moved to a background shell rather than blocking on it.
+
+**GitHub repo pushed.** User created `MM-Content-Analysis-Dashboard` (public)
+under GitHub username `reddymohithh` via the web UI. Added it as the `origin`
+remote, renamed the local branch to `main`, and pushed both commits
+(`git push -u origin main`) — succeeded on the first attempt.
