@@ -1032,3 +1032,24 @@ both real Reddit-related subject lines), set content-quality min to 85
 toggled the "Name-drop" hook-type chip on Subject Line Lab (narrowed to 8
 rows, all tagged Name-drop, matching the "(8)" count already shown in the
 aggregate card above). Ran a full production build before committing.
+
+## Round 12: Retention search + single-column click-through
+
+The user came back with Retention's criteria: just a subject-line search
+(no range/date filters this time, unlike Editions), and the same
+click-through change already made to Subject Line Lab and the merged
+edition-detail links list — only the subject cell should navigate to the
+edition, Date/Unsub/Flag now plain non-interactive text.
+
+Built `RetentionExplorer.tsx` following the same client-component pattern as
+the previous round (search state + `useMemo` filter over a server-fetched
+row array), intentionally simpler than `EditionsExplorer`/
+`SubjectLineLabExplorer` since only search was asked for here — no
+speculative extra filter UI added.
+
+Verified in the browser: `read_page`'s interactive-element list showed only
+subject-line links (Date/Unsub/Flag cells absent from it entirely, not just
+visually unstyled), and a dispatched `input` event on the search box
+narrowed 38 -> 2 editions matching "Reddit," both genuinely
+Reddit-related subject lines. Ran a full production build before
+committing.

@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { getAllEditions, getPublicationSnapshot, trailingAverages } from "@/lib/data/editions";
-import { usDate, round2 } from "@/lib/format";
-import { PageTitle, StatCard, Card, DataTable } from "@/components/dashboard/ui";
+import { round2 } from "@/lib/format";
+import { PageTitle, StatCard, Card } from "@/components/dashboard/ui";
+import { RetentionExplorer, type RetentionRow } from "@/components/dashboard/RetentionExplorer";
 
 export const dynamic = "force-dynamic";
 
@@ -46,47 +46,17 @@ export default async function RetentionPage() {
         </p>
       </Card>
 
-      <DataTable
-        columns={[
-          { label: "Date" },
-          { label: "Subject" },
-          { label: "Unsub", align: "right" },
-          { label: "Flag", align: "right" },
-        ]}
-      >
-        {editions.map((e) => {
-          const above = e.unsubRate > avgUnsub;
-          return (
-            <tr key={e.id} className="border-t border-hairline">
-              <td className="p-0">
-                <Link href={`/editions/${e.id}`} className="block whitespace-nowrap px-3.5 py-2.5 font-mono text-[12px] text-text-muted no-underline">
-                  {usDate(e.publishedAt, true)}
-                </Link>
-              </td>
-              <td className="p-0">
-                <Link href={`/editions/${e.id}`} className="block px-3.5 py-2.5 text-[13px] font-semibold text-ink no-underline">
-                  {e.subject}
-                </Link>
-              </td>
-              <td className="p-0">
-                <Link href={`/editions/${e.id}`} className="block px-3.5 py-2.5 text-right text-[13px] text-ink no-underline">
-                  {e.unsubRate}%
-                </Link>
-              </td>
-              <td className="p-0">
-                <Link
-                  href={`/editions/${e.id}`}
-                  className={`block px-3.5 py-2.5 text-right text-[12.5px] font-medium no-underline ${
-                    above ? "text-negative" : "text-positive"
-                  }`}
-                >
-                  {above ? "Above average" : "Normal"}
-                </Link>
-              </td>
-            </tr>
-          );
-        })}
-      </DataTable>
+      <RetentionExplorer
+        rows={editions.map(
+          (e): RetentionRow => ({
+            id: e.id,
+            subject: e.subject,
+            publishedAt: e.publishedAt.toISOString(),
+            unsubRate: e.unsubRate,
+            aboveAverage: e.unsubRate > avgUnsub,
+          }),
+        )}
+      />
     </div>
   );
 }
