@@ -1125,3 +1125,14 @@ direct value rather than another screenshot: bring 1600px down to 1400px.
 Applied and verified the same way as the previous two rounds (live DOM
 measurement at a 2000px test viewport: navbar 2000px, content 1400px). Ran
 a full production build before committing.
+
+## Round 16: dropdown arrow spacing
+
+Small follow-up from an annotated screenshot pointing at the hook-type
+select's native dropdown arrow sitting flush against the field's right
+border. It was sharing the same `numberCls` padding as the plain number
+inputs (`px-2.5` both sides), which doesn't leave enough room for a native
+`<select>`'s built-in arrow icon. Gave it its own class with asymmetric
+padding (`pl-2.5 pr-7`) instead of reusing the shared class, so the arrow
+now sits with breathing room from the edge. Verified visually in the
+browser and ran a full production build before committing.

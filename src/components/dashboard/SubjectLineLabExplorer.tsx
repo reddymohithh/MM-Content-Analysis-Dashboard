@@ -118,7 +118,7 @@ export function SubjectLineLabExplorer({
             <select
               value={hookType}
               onChange={(e) => setHookType(e.target.value)}
-              className={numberCls}
+              className="w-full rounded-lg border border-border bg-card py-1.5 pl-2.5 pr-7 text-[12.5px] outline-none focus:border-orange"
             >
               <option value="">All hook types</option>
               {hookTypes.map((h) => (
