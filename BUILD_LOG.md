@@ -1098,3 +1098,17 @@ actual rendered DOM: navbar `getBoundingClientRect().width` = 2000 (full
 bleed, as intended), content wrapper width = 1120 (capped and centered, as
 intended) on both Overview and Editions. Ran a full production build before
 committing.
+
+## Round 15: widen content back out
+
+Immediate follow-up: another annotated screenshot, this time marking lines
+much closer to the viewport edges than the 1120px cap from Round 14 landed
+at — 1120px turned out too narrow once actually seen on the user's screen.
+Increased the shared layout's `max-w-[1120px]` to `max-w-[1600px]`. Rather
+than trying to reverse-engineer exact pixel coordinates from the annotated
+screenshot (unreliable — no reliable way to know the physical-to-logical
+pixel scaling of an image pasted from the user's own screen), verified the
+result directly: resized the live browser to 2000px and measured the
+rendered DOM, confirming content now renders at 1600px centered (200px
+margin each side) versus the full viewport, a visibly wider but still
+margined layout. Ran a full production build before committing.
