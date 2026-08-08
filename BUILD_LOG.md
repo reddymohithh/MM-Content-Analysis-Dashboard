@@ -1072,3 +1072,29 @@ Verified via direct `<select>` value/`change`-event dispatch (native select
 interaction doesn't reliably drive through simulated clicks) that choosing
 "Name-drop" narrows 38 -> 8 rows, matching the "(8)" count already shown in
 the aggregate card above. Ran a full production build before committing.
+
+## Round 14: cap content width app-wide
+
+The user sent an annotated screenshot (freehand red brackets on both edges
+of the Overview chart) taken on a wide monitor, showing the page content
+stretching edge to edge with no max-width — the chart's 38 bars spread
+across nearly 2000px, and asked to trim that down to "this exact space,"
+leaving the navbar untouched.
+
+The edition detail page already had its own `mx-auto max-w-[1120px]`
+wrapper (added back when it was originally built), but no other page did —
+Overview, Editions, Subject Line Lab, and Retention all just used the
+layout's flat `px-8` padding, so they stretched to fill whatever the
+viewport was. Fixed at the shared layout level instead of per page: added
+`mx-auto w-full max-w-[1120px]` around `{children}` in
+`(dashboard)/layout.tsx`'s scroll container, below the navbar (which stays
+outside that wrapper and still spans full width). Removed the now-redundant
+per-page `max-w-[1120px]` wrapper from the edition detail page's own markup
+since it's inherited from the shared layout now, avoiding a pointless
+nested constraint.
+
+Verified by resizing the browser viewport to 2000px wide and measuring the
+actual rendered DOM: navbar `getBoundingClientRect().width` = 2000 (full
+bleed, as intended), content wrapper width = 1120 (capped and centered, as
+intended) on both Overview and Editions. Ran a full production build before
+committing.
