@@ -39,7 +39,6 @@ export default async function EditionDetailPage({
   const tips = generateEditionTips(edition, audience, avgCtr);
 
   const editorialLinks = edition.topLinks;
-  const promoted = edition.promotedLinks;
 
   const notices: string[] = [];
   if (!quality.voiceComputed) {
@@ -109,39 +108,21 @@ export default async function EditionDetailPage({
           <div className="border-b border-border bg-card-soft px-3.5 py-2.5 font-mono text-[10.5px] uppercase tracking-wide text-text-muted">
             Top links clicked
           </div>
-          {editorialLinks.length === 0 && promoted.length === 0 ? (
+          {editorialLinks.length === 0 ? (
             <EmptyState>No link clicks recorded.</EmptyState>
           ) : (
-            <>
-              {editorialLinks.map((l) => (
-                <a
-                  key={l.id}
-                  href={l.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-between border-t border-hairline px-3.5 py-2 text-[12.5px] no-underline first:border-t-0"
-                >
-                  <span className="truncate pr-3">{l.label}</span>
-                  <span className="flex-shrink-0 font-mono text-text-muted">{l.clicks}</span>
-                </a>
-              ))}
-              {promoted.map((p) => (
-                <div
-                  key={p.id}
-                  className="flex items-center justify-between border-t border-hairline px-3.5 py-2 text-[12.5px] first:border-t-0"
-                >
-                  <span className="truncate pr-3">
-                    <span className="font-semibold">{p.sponsor}</span> — {p.description}
-                  </span>
-                  <span className="flex flex-shrink-0 items-center gap-2">
-                    <span className="font-mono text-[10px] uppercase text-text-faint">
-                      Promoted
-                    </span>
-                    <span className="font-mono text-text-muted">{p.clicks}</span>
-                  </span>
-                </div>
-              ))}
-            </>
+            editorialLinks.map((l) => (
+              <a
+                key={l.id}
+                href={l.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between border-t border-hairline px-3.5 py-2 text-[12.5px] no-underline first:border-t-0"
+              >
+                <span className="truncate pr-3">{l.label}</span>
+                <span className="flex-shrink-0 font-mono text-text-muted">{l.clicks}</span>
+              </a>
+            ))
           )}
         </div>
 

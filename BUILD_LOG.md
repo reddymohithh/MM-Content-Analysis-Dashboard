@@ -922,3 +922,30 @@ silently changed.
 Verified every change in the browser against real synced data (including an
 edition with actual sponsored placements, specifically to catch the
 truncation bug above) and ran a full production build before committing.
+
+## Round 9: poll chart color, drop promoted links from the display
+
+Two quick edition-detail tweaks:
+
+- Poll bar chart: all four categories (Loved it / Pretty useful / Okay / Not
+  helpful) now render in the same neutral gray (`--color-text-muted`)
+  instead of the previous four-color scheme (orange/amber/tan/faint).
+- Removed promoted/sponsored links from the merged link list entirely —
+  the "Top links clicked" card now only ever shows organic links. Left the
+  underlying `promotedLinks` data/table/sync untouched (still fetched and
+  stored), since the instruction was about what displays on this page, not
+  about ripping out the data model — easy to bring back into view later if
+  wanted.
+
+Verified both in the browser (an edition with real sponsored placements
+confirmed they no longer appear at all) and ran a full production build
+before committing.
+
+A message arrived mid-turn clarifying the earlier "vertical boxes" request
+from Round 8: that one had stacked the four quality boxes vertically (one
+per row) but each box still laid its donut and explanation out
+side-by-side internally. The user meant the donut-then-explanation
+relationship itself to be vertical too — donut on top, explanation below,
+within each box. Fixed by changing that inner container from `flex` (row)
+to `flex flex-col items-start` in `QualityDonuts.tsx`. Verified in the
+browser and rebuilt before committing.

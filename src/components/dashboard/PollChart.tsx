@@ -5,10 +5,10 @@ import type { PollTally } from "@/lib/types";
 import { EmptyState } from "./ui";
 
 const CATEGORIES = [
-  { key: "lovedIt", label: "Loved it", color: "var(--color-orange)" },
-  { key: "prettyUseful", label: "Pretty useful", color: "var(--color-amber)" },
-  { key: "itWasOkay", label: "Okay", color: "var(--color-tan)" },
-  { key: "notHelpful", label: "Not helpful", color: "var(--color-text-faint)" },
+  { key: "lovedIt", label: "Loved it", color: "var(--color-text-muted)" },
+  { key: "prettyUseful", label: "Pretty useful", color: "var(--color-text-muted)" },
+  { key: "itWasOkay", label: "Okay", color: "var(--color-text-muted)" },
+  { key: "notHelpful", label: "Not helpful", color: "var(--color-text-muted)" },
 ] as const;
 
 const CHART_TOP = 14;

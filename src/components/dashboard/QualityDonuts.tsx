@@ -12,7 +12,7 @@ export function QualityDonuts({ result }: { result: QualityScoreResult }) {
         {result.components.map((c) => (
           <div
             key={c.key}
-            className="flex gap-3 rounded-[10px] border border-border bg-card-soft p-3.5"
+            className="flex flex-col items-start gap-3 rounded-[10px] border border-border bg-card-soft p-3.5"
           >
             <svg width={84} height={84} viewBox="0 0 100 100" className="flex-shrink-0">
               <circle cx={50} cy={50} r={R} fill="none" stroke="var(--color-border)" strokeWidth={9} />
@@ -49,7 +49,7 @@ export function QualityDonuts({ result }: { result: QualityScoreResult }) {
                 {c.weightLabel}
               </text>
             </svg>
-            <div className="min-w-0">
+            <div className="w-full min-w-0">
               <div className="mb-1 text-[12.5px] font-semibold leading-tight">{c.name}</div>
               <div className="text-[11.5px] leading-relaxed text-text-muted">
                 {c.raw}. {c.benchmark}
