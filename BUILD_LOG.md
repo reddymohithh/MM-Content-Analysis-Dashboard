@@ -961,3 +961,26 @@ alignment from `items-start` to `items-center` (the explanation text below
 stays full-width and left-aligned regardless, since it has an explicit
 `w-full`). Verified in the browser after each change and ran a full
 production build before committing.
+
+## Round 10: Subject Line Lab
+
+Three changes, one of them against a reference screenshot:
+
+- Removed the "Subject Line Lab / Every real subject line..." header block,
+  same reasoning as every other page's header removal this session.
+- Table rows previously wrapped every cell (Hook type, Length, Number, Open)
+  in its own `<Link>` to the edition, all five cells independently
+  clickable. Only the subject-line cell should be — the other four are now
+  plain `<td>` text with no link, no href, not clickable.
+- Rebuilt the "Average open rate by hook type" card to match the provided
+  screenshot's layout: previously label/bar/value sat side by side in one
+  row with the bar squeezed into a fixed middle column; now each row is
+  label-and-value on one line (`justify-between`) with the bar spanning the
+  *full* card width on the line below it, and the card title changed from a
+  small uppercase mono eyebrow to an actual serif heading, matching the
+  reference.
+
+Verified in the browser (screenshot matched against the reference, and
+`read_page`'s interactive-element list confirmed only the subject-line link
+appears per row, not four extra ones) and ran a full production build
+before committing.

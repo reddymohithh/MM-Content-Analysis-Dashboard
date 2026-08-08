@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getAllEditions } from "@/lib/data/editions";
 import { computeHookTypeAverages, type InsightEdition } from "@/lib/scoring/insights";
 import { HOOK_TYPE_LABELS } from "@/lib/scoring/subject-line";
-import { PageTitle, Card, Eyebrow, DataTable } from "@/components/dashboard/ui";
+import { Card, DataTable } from "@/components/dashboard/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -26,27 +26,24 @@ export default async function SubjectLineLabPage() {
 
   return (
     <div>
-      <PageTitle
-        title="Subject Line Lab"
-        caption="Every real subject line in the trailing window, tagged by hook type, length, and number presence."
-      />
-
       <Card className="mb-4">
-        <Eyebrow>Average open rate by hook type</Eyebrow>
-        <div className="space-y-2">
+        <h2 className="mb-4 font-serif text-[18px] font-semibold">
+          Average open rate by hook type
+        </h2>
+        <div className="space-y-4">
           {hookAverages.map((h) => (
-            <div key={h.hookType} className="flex items-center gap-3">
-              <div className="w-[150px] flex-shrink-0 truncate text-[12.5px]">
-                {h.label} <span className="text-text-faint">({h.count})</span>
+            <div key={h.hookType}>
+              <div className="mb-1.5 flex items-baseline justify-between text-[13.5px]">
+                <span>
+                  {h.label} <span className="text-text-faint">({h.count})</span>
+                </span>
+                <span className="font-semibold">{h.avgOpenRate}%</span>
               </div>
-              <div className="h-2 flex-1 rounded-full bg-border">
+              <div className="h-2 w-full rounded-full bg-border">
                 <div
                   className="h-2 rounded-full bg-amber"
                   style={{ width: `${(h.avgOpenRate / maxOpen) * 100}%` }}
                 />
-              </div>
-              <div className="w-12 flex-shrink-0 text-right font-mono text-[12px]">
-                {h.avgOpenRate}%
               </div>
             </div>
           ))}
@@ -65,30 +62,23 @@ export default async function SubjectLineLabPage() {
         {editions.map((e) => (
           <tr key={e.id} className="border-t border-hairline">
             <td className="p-0">
-              <Link href={`/editions/${e.id}`} className="block px-3.5 py-2.5 text-[13px] font-semibold text-ink no-underline">
+              <Link
+                href={`/editions/${e.id}`}
+                className="block px-3.5 py-2.5 text-[13px] font-semibold text-ink no-underline"
+              >
                 {e.subject}
               </Link>
             </td>
-            <td className="p-0">
-              <Link href={`/editions/${e.id}`} className="block px-3.5 py-2.5 text-[12.5px] text-text-muted no-underline">
-                {HOOK_TYPE_LABELS[e.hookType]}
-              </Link>
+            <td className="px-3.5 py-2.5 text-[12.5px] text-text-muted">
+              {HOOK_TYPE_LABELS[e.hookType]}
             </td>
-            <td className="p-0">
-              <Link href={`/editions/${e.id}`} className="block px-3.5 py-2.5 text-right font-mono text-[12px] text-text-muted no-underline">
-                {e.charLength} char
-              </Link>
+            <td className="px-3.5 py-2.5 text-right font-mono text-[12px] text-text-muted">
+              {e.charLength} char
             </td>
-            <td className="p-0">
-              <Link href={`/editions/${e.id}`} className="block px-3.5 py-2.5 text-right text-[12.5px] text-text-muted no-underline">
-                {e.hasNumber ? "Yes" : "No"}
-              </Link>
+            <td className="px-3.5 py-2.5 text-right text-[12.5px] text-text-muted">
+              {e.hasNumber ? "Yes" : "No"}
             </td>
-            <td className="p-0">
-              <Link href={`/editions/${e.id}`} className="block px-3.5 py-2.5 text-right text-[13px] text-ink no-underline">
-                {e.openRate}%
-              </Link>
-            </td>
+            <td className="px-3.5 py-2.5 text-right text-[13px] text-ink">{e.openRate}%</td>
           </tr>
         ))}
       </DataTable>
