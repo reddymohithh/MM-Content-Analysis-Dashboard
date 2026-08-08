@@ -71,38 +71,28 @@ export function SubjectLineLabExplorer({
   hookTypes: { value: string; label: string }[];
 }) {
   const [search, setSearch] = useState("");
-  const [selectedHooks, setSelectedHooks] = useState<Set<string>>(new Set());
+  const [hookType, setHookType] = useState("");
   const [lengthMin, setLengthMin] = useState("");
   const [lengthMax, setLengthMax] = useState("");
   const [openMin, setOpenMin] = useState("");
   const [openMax, setOpenMax] = useState("");
 
-  function toggleHook(value: string) {
-    setSelectedHooks((prev) => {
-      const next = new Set(prev);
-      if (next.has(value)) next.delete(value);
-      else next.add(value);
-      return next;
-    });
-  }
-
   const filtered = useMemo(() => {
     return rows.filter((r) => {
       if (search && !r.subject.toLowerCase().includes(search.toLowerCase())) return false;
-      if (selectedHooks.size > 0 && !selectedHooks.has(r.hookType)) return false;
+      if (hookType && r.hookType !== hookType) return false;
       if (lengthMin !== "" && r.charLength < Number(lengthMin)) return false;
       if (lengthMax !== "" && r.charLength > Number(lengthMax)) return false;
       if (openMin !== "" && r.openRate < Number(openMin)) return false;
       if (openMax !== "" && r.openRate > Number(openMax)) return false;
       return true;
     });
-  }, [rows, search, selectedHooks, lengthMin, lengthMax, openMin, openMax]);
+  }, [rows, search, hookType, lengthMin, lengthMax, openMin, openMax]);
 
-  const hasActiveFilters =
-    selectedHooks.size > 0 || lengthMin || lengthMax || openMin || openMax;
+  const hasActiveFilters = hookType || lengthMin || lengthMax || openMin || openMax;
 
   function clearFilters() {
-    setSelectedHooks(new Set());
+    setHookType("");
     setLengthMin("");
     setLengthMax("");
     setOpenMin("");
@@ -120,32 +110,24 @@ export function SubjectLineLabExplorer({
           className={`${inputCls} mb-3.5`}
         />
 
-        <div className="mb-3.5">
-          <div className="mb-1.5 font-mono text-[10px] uppercase tracking-wide text-text-muted">
-            Hook type
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {hookTypes.map((h) => {
-              const active = selectedHooks.has(h.value);
-              return (
-                <button
-                  key={h.value}
-                  type="button"
-                  onClick={() => toggleHook(h.value)}
-                  className={`rounded-full border px-2.5 py-1 text-[12px] transition-colors ${
-                    active
-                      ? "border-orange bg-orange text-ink"
-                      : "border-border bg-card text-text-muted"
-                  }`}
-                >
+        <div className="grid grid-cols-3 gap-3.5">
+          <div>
+            <div className="mb-1 font-mono text-[10px] uppercase tracking-wide text-text-muted">
+              Hook type
+            </div>
+            <select
+              value={hookType}
+              onChange={(e) => setHookType(e.target.value)}
+              className={numberCls}
+            >
+              <option value="">All hook types</option>
+              {hookTypes.map((h) => (
+                <option key={h.value} value={h.value}>
                   {h.label}
-                </button>
-              );
-            })}
+                </option>
+              ))}
+            </select>
           </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3.5">
           <RangeField
             label="Length"
             min={lengthMin}

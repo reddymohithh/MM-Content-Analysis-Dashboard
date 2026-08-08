@@ -1053,3 +1053,22 @@ visually unstyled), and a dispatched `input` event on the search box
 narrowed 38 -> 2 editions matching "Reddit," both genuinely
 Reddit-related subject lines. Ran a full production build before
 committing.
+
+## Round 13: hook-type filter, chips -> dropdown
+
+The user flagged a forward-looking concern with the hook-type toggle chips
+from Round 11: they don't expect to stay locked to the current six hook
+types, and each new one added over time would grow the chip row and clog up
+the layout. Swapped it for a `<select>` dropdown ("All hook types" plus one
+option per type) — scales to any number of categories without changing the
+UI's footprint, at the cost of single-select instead of multi-select
+(judged an acceptable trade given the actual complaint was about visual
+clutter, not needing to filter by multiple hook types at once). Folded it
+into the same row as the Length/Open rate range filters (`grid-cols-3`)
+instead of its own full-width section above them, now that it's compact
+enough to sit inline.
+
+Verified via direct `<select>` value/`change`-event dispatch (native select
+interaction doesn't reliably drive through simulated clicks) that choosing
+"Name-drop" narrows 38 -> 8 rows, matching the "(8)" count already shown in
+the aggregate card above. Ran a full production build before committing.
