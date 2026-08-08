@@ -6,12 +6,15 @@ const CIRCUMFERENCE = 2 * Math.PI * R;
 export function QualityDonuts({ result }: { result: QualityScoreResult }) {
   return (
     <div>
-      <p className="mb-5 text-[13px] leading-relaxed">{result.narrative}</p>
+      <p className="mb-4 text-[13px] leading-relaxed">{result.narrative}</p>
 
-      <div className="mb-5 flex flex-wrap justify-around gap-4">
+      <div className="grid grid-cols-2 gap-3">
         {result.components.map((c) => (
-          <div key={c.key} className="flex flex-col items-center" style={{ width: 108 }}>
-            <svg width={100} height={100} viewBox="0 0 100 100">
+          <div
+            key={c.key}
+            className="flex gap-3 rounded-[10px] border border-border bg-card-soft p-3.5"
+          >
+            <svg width={84} height={84} viewBox="0 0 100 100" className="flex-shrink-0">
               <circle cx={50} cy={50} r={R} fill="none" stroke="var(--color-border)" strokeWidth={9} />
               <circle
                 cx={50}
@@ -46,20 +49,13 @@ export function QualityDonuts({ result }: { result: QualityScoreResult }) {
                 {c.weightLabel}
               </text>
             </svg>
-            <div className="mt-1 text-center text-[11.5px] font-medium leading-tight">
-              {c.name}
+            <div className="min-w-0">
+              <div className="mb-1 text-[12.5px] font-semibold leading-tight">{c.name}</div>
+              <div className="text-[11.5px] leading-relaxed text-text-muted">
+                {c.raw}. {c.benchmark}
+              </div>
+              <div className="mt-1 text-[11.5px] leading-relaxed">{c.why}</div>
             </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="space-y-3 border-t border-hairline pt-4">
-        {result.components.map((c) => (
-          <div key={c.key} className="text-[12.5px] leading-relaxed">
-            <span className="font-semibold">{c.name}: </span>
-            <span className="text-text-muted">{c.raw}. </span>
-            <span className="text-text-muted">{c.benchmark} </span>
-            <span>{c.why}</span>
           </div>
         ))}
       </div>

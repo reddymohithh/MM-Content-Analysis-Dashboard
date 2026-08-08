@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getAllEditions, trailingAverages } from "@/lib/data/editions";
 import { computeQualityScore } from "@/lib/scoring/quality-score";
 import { usDate } from "@/lib/format";
-import { PageTitle, DataTable } from "@/components/dashboard/ui";
+import { DataTable } from "@/components/dashboard/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -12,11 +12,6 @@ export default async function EditionsListPage() {
 
   return (
     <div>
-      <PageTitle
-        title="Editions"
-        caption={`${editions.length} editions in the trailing window, newest first.`}
-      />
-
       <DataTable
         columns={[
           { label: "Date" },

@@ -10,7 +10,7 @@
  * (reads env vars from .env.local via Node's --env-file flag, wired up in
  * package.json)
  */
-import { eq } from "drizzle-orm";
+import { and, eq, gte, notInArray } from "drizzle-orm";
 import { db } from "../src/lib/db";
 import {
   editions,
@@ -81,9 +81,19 @@ async function main() {
     direction: "desc",
     expand: ["stats"],
   });
-  const recentPosts = postsRes.data.filter(
-    (p) => (p.publish_date ?? 0) * 1000 >= cutoff,
-  );
+  const withinWindow = postsRes.data.filter((p) => (p.publish_date ?? 0) * 1000 >= cutoff);
+  // Only editions sent on both email and web count as a real edition here —
+  // web-only posts have no email stats (open rate is meaningless for them,
+  // as discovered when a web-only post was showing 0%/0% before this
+  // filter existed) and email-only posts aren't the newsletter's normal
+  // dual-channel format.
+  const recentPosts = withinWindow.filter((p) => p.platform === "both");
+  const skippedForPlatform = withinWindow.length - recentPosts.length;
+  if (skippedForPlatform > 0) {
+    console.log(
+      `Skipping ${skippedForPlatform} post(s) in this window that weren't published on both email and web.`,
+    );
+  }
 
   // Find the recurring reader-feedback poll (see docs/DATA_FINDINGS.md: "Did
   // you find this edition helpful", 46 polls exist on the publication).
@@ -218,6 +228,19 @@ async function main() {
     }
 
     console.log(`Synced ${post.id}: ${subject}`);
+  }
+
+  // Clean up editions previously synced into this window that no longer
+  // belong (e.g. a post that used to be "both" and got pulled from web, or
+  // simply aged out of the trailing window on this run).
+  const keepIds = recentPosts.map((p) => p.id);
+  const staleCondition =
+    keepIds.length > 0
+      ? and(eq(editions.dataSource, "beehiiv_live"), gte(editions.publishedAt, new Date(cutoff)), notInArray(editions.id, keepIds))
+      : and(eq(editions.dataSource, "beehiiv_live"), gte(editions.publishedAt, new Date(cutoff)));
+  const removed = await db.delete(editions).where(staleCondition).returning({ id: editions.id });
+  if (removed.length > 0) {
+    console.log(`Removed ${removed.length} stale edition(s) no longer in this window/platform filter.`);
   }
 
   console.log(`Done. Synced ${recentPosts.length} editions from the trailing ${TRAILING_DAYS} days.`);

@@ -825,3 +825,48 @@ Vercel site:
 
 Verified in the browser (screenshot + live DOM checks) and ran a full
 production build before committing.
+
+## Round 7: global fixes, Editions header, quality-box redesign
+
+Three requests: two global (navbar dot, a Beehiiv data-correctness rule),
+plus Editions-page and edition-detail tweaks.
+
+**Global — navbar dot.** Removed the orange "." after "Marketing Monk" in
+the navbar wordmark, per instruction.
+
+**Global — email+web-only filter, a real data-correctness fix.** The user
+pointed out that only posts published on *both* email and web should count
+as an edition — not web-only or email-only posts. Checked Beehiiv's raw post
+payload directly rather than assume a field name, and found a `platform`
+field right on the post object itself (`"both"`, `"web"`, or `"email"` — not
+something inferred from stats). This also retroactively explained an
+earlier oddity: the "How AI is Affecting Behavioral Health SEO in 2026"
+edition showing 0%/0% wasn't a low-volume test send as assumed at the time —
+it was a **web-only** post with no email stats at all, so `open_rate`/
+`click_rate` were meaningless zeros. Added `platform` to the `BeehiivPost`
+type and filtered `scripts/seed-from-beehiiv.ts`'s trailing-window posts to
+`platform === "both"` before syncing anything. Also added cleanup logic to
+the same script: after computing the current run's kept-post-id set, delete
+any previously-synced `beehiiv_live` edition inside the trailing window that
+isn't in that set, so a post that used to qualify (or was synced before this
+filter existed) gets removed on the next sync rather than lingering stale.
+Re-ran `seed:beehiiv` against `local-real` to apply this to the already-
+synced data.
+
+**Editions list page.** Removed the "Editions / N editions in the trailing
+window, newest first" header block, matching the same reasoning as
+Overview's earlier header removal.
+
+**Edition detail — quality section.** Two changes: the heading now reads
+"Why this edition scored N% content quality" (was just "...N%"), and the
+four quality-component donuts were restructured from "four donuts in a row,
+then all four explanations pooled together below" into four self-contained
+boxes — each one a bordered card holding its own donut directly beside its
+own name/raw-value/benchmark/why text, in a 2x2 grid. Verified in the
+browser: the Coca-Cola edition's quality section now shows each of Reader
+satisfaction, Engagement depth, Retention signal, and Writing/voice
+compliance as its own card.
+
+Ran a full production build; committed locally (push still deferred per the
+user's "do everything locally, push once at the end" instruction from
+Round 6).

@@ -101,7 +101,7 @@ export default async function EditionDetailPage({
       </div>
 
       <Card className="mb-4">
-        <Eyebrow>Why this edition scored {quality.total}%</Eyebrow>
+        <Eyebrow>Why this edition scored {quality.total}% content quality</Eyebrow>
         <QualityDonuts result={quality} />
       </Card>
 

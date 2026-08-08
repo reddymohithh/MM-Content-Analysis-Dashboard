@@ -38,7 +38,7 @@ export function Navbar() {
           href="/overview"
           className="flex-shrink-0 whitespace-nowrap font-serif text-[19px] font-semibold text-amber no-underline"
         >
-          Marketing Monk<span className="text-orange">.</span>
+          Marketing Monk
         </Link>
         <div className="flex items-center gap-1 min-w-0">
           {TABS.map((tab) => {

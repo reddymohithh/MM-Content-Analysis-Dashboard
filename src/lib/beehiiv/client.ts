@@ -123,6 +123,8 @@ export interface BeehiivPost {
   displayed_date?: number;
   authors?: string[];
   content_tags?: string[];
+  /** Which channel(s) this post actually went out on. */
+  platform?: "both" | "web" | "email";
   stats?: BeehiivPostStats;
 }
 
