@@ -67,10 +67,10 @@ export default async function OverviewPage() {
   return (
     <div>
       <div className="mb-4 grid grid-cols-4 gap-3.5">
-        <StatCard label="Subscribers" value={publication.activeSubscribers.toLocaleString()} sub="active" />
-        <StatCard label="Open rate" value={`${avgOpenRate}%`} sub="trailing window average" />
-        <StatCard label="CTR, overall" value={`${Math.round(avgCtr * 100) / 100}%`} sub="all links, every section" />
-        <GradientStatCard label="Content quality" value={`${avgQuality}%`} sub="engagement, retention, voice, poll" />
+        <StatCard label="Subscribers" value={publication.activeSubscribers.toLocaleString()} />
+        <StatCard label="Open rate" value={`${avgOpenRate}%`} />
+        <StatCard label="CTR, overall" value={`${Math.round(avgCtr * 100) / 100}%`} />
+        <GradientStatCard label="Content quality" value={`${avgQuality}%`} />
       </div>
 
       <div className="mb-4">

@@ -787,3 +787,41 @@ default was actually wanted.
 Verified the full page in the browser after all changes (logo, tab colors,
 removed header lines, new chart with working hover tooltip) and ran a full
 production build before committing.
+
+## Round 6: Overview follow-up tweaks, and a push permission problem
+
+A `git push` after the previous commit failed with a 403 ("Permission ...
+denied to reddymohithh") — the macOS Keychain's cached GitHub credential had
+been silently replaced (timestamped that same session) with the fine-grained
+token from the earlier tangent, which apparently doesn't have working push
+access to this repo yet. Asked the user whether they'd finished generating
+and using that token; they redirected instead: keep working locally and
+commit as normal, sort out the push once, later, in bulk. Adopted that as
+the working pattern going forward — every change below is committed locally
+immediately, push deferred.
+
+Four more Overview-page tweaks from the user, based on the deployed
+Vercel site:
+
+- Chart tooltip: subject line was wrapping to two lines and the tooltip felt
+  oversized. Narrowed it (220px -> 172px, tighter padding/spacing) and made
+  the subject line `whitespace-nowrap overflow-hidden text-ellipsis` with a
+  `title` attribute for the full text on native hover — verified via a
+  dispatched `mouseenter` on the chart's hover-target rects plus
+  `getComputedStyle`/`scrollWidth` checks that it now renders as a single,
+  correctly truncating line (172px tooltip, 217px of text content, single
+  23px-tall line).
+- Chart header: "Open rate vs CTR, day by day" -> "OR vs CTR" (removed the
+  redundant last-vs-day framing and abbreviated per the user's exact wording).
+- Navbar logo: the Beehiiv-hosted logo image added last round wasn't
+  rendering for the user ("not visible now") — reverted to the original text
+  wordmark, now recolored to the brand's amber/yellow
+  (`--color-amber`/`text-amber`) instead of cream, per instruction. Left
+  `media.beehiiv.com` in `next.config.ts`'s image remote patterns in case a
+  logo image comes back later.
+- Removed the small caption line under all four Overview stat cards
+  ("active", "trailing window average", "all links, every section",
+  "engagement, retention, voice, poll") — just the label and number now.
+
+Verified in the browser (screenshot + live DOM checks) and ran a full
+production build before committing.

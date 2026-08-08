@@ -57,7 +57,7 @@ export function OverviewChart({ editions }: { editions: ChartEdition[] }) {
     <div className="rounded-xl border border-border bg-card p-5">
       <div className="mb-3 flex items-baseline justify-between">
         <div className="whitespace-nowrap font-serif text-[16px] font-semibold">
-          Open rate vs CTR, day by day
+          OR vs CTR
         </div>
         <div className="font-mono text-[10px] text-text-muted">{n} EDITIONS</div>
       </div>
@@ -151,15 +151,15 @@ export function OverviewChart({ editions }: { editions: ChartEdition[] }) {
 
         {hover && (
           <div
-            className="pointer-events-none absolute top-0 z-10 w-[220px] -translate-x-1/2 rounded-lg border border-border bg-card p-3 shadow-lg"
+            className="pointer-events-none absolute top-0 z-10 w-[172px] -translate-x-1/2 rounded-lg border border-border bg-card p-2.5 shadow-lg"
             style={{
               left: `${Math.min(85, Math.max(15, (xCenter(hoverIdx!) / CHART_W) * 100))}%`,
             }}
           >
-            <div className="mb-2 font-mono text-[11px] text-text-muted">
+            <div className="mb-1.5 font-mono text-[10.5px] text-text-muted">
               {usDate(hover.publishedAt, true)}
             </div>
-            <div className="space-y-1.5 text-[12.5px]">
+            <div className="space-y-1 text-[12px]">
               <div className="flex items-center justify-between gap-3">
                 <span className="flex items-center gap-1.5">
                   <span className="inline-block h-2 w-2 rounded-full bg-orange" />
@@ -175,7 +175,10 @@ export function OverviewChart({ editions }: { editions: ChartEdition[] }) {
                 <span className="font-semibold">{hover.ctrOverall}%</span>
               </div>
             </div>
-            <div className="mt-2 border-t border-hairline pt-2 text-[12px] leading-snug">
+            <div
+              className="mt-1.5 overflow-hidden text-ellipsis whitespace-nowrap border-t border-hairline pt-1.5 text-[11.5px]"
+              title={hover.subject}
+            >
               {hover.subject}
             </div>
           </div>
