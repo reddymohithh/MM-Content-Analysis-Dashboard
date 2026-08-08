@@ -64,11 +64,17 @@ body {
   font-family: var(--font-sans);
 }
 
-a {
-  color: var(--color-link);
-}
-a:hover {
-  color: var(--color-orange);
+/* In Tailwind's base layer so any explicit text-color utility (e.g. on the
+   navbar's or a table's <Link>s) correctly wins over this default — an
+   unlayered rule here would beat utility classes regardless of specificity,
+   since Tailwind wraps its utilities in a lower-priority cascade layer. */
+@layer base {
+  a {
+    color: var(--color-link);
+  }
+  a:hover {
+    color: var(--color-orange);
+  }
 }
 
 /* Custom scrollbar, matches the wireframe */

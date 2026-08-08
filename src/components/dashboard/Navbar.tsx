@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
@@ -34,11 +35,15 @@ export function Navbar() {
   return (
     <nav className="flex-shrink-0 flex items-center justify-between bg-ink px-8 py-3.5">
       <div className="flex items-center gap-6 min-w-0">
-        <Link
-          href="/overview"
-          className="font-serif text-[19px] font-semibold text-cream whitespace-nowrap flex-shrink-0 no-underline"
-        >
-          Marketing Monk<span className="text-orange">.</span>
+        <Link href="/overview" className="flex-shrink-0 leading-none no-underline">
+          <Image
+            src="https://media.beehiiv.com/cdn-cgi/image/format=auto,onerror=redirect/uploads/asset/file/f1b57442-a2d2-41d8-be4e-88b9c304be46/asdk.png"
+            alt="Marketing Monk"
+            width={130}
+            height={28}
+            className="h-7 w-auto"
+            priority
+          />
         </Link>
         <div className="flex items-center gap-1 min-w-0">
           {TABS.map((tab) => {
@@ -48,10 +53,10 @@ export function Navbar() {
               <Link
                 key={tab.href}
                 href={tab.href}
-                className={`whitespace-nowrap flex-shrink-0 rounded-lg px-3 py-1.5 text-[13px] font-medium no-underline transition-colors ${
+                className={`whitespace-nowrap flex-shrink-0 rounded-lg px-3 py-1.5 text-[13px] font-bold no-underline transition-colors ${
                   active
                     ? "bg-orange text-ink"
-                    : "text-text-faint hover:text-cream"
+                    : "text-text-muted hover:text-cream"
                 }`}
               >
                 {tab.label}

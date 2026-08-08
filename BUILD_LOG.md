@@ -711,3 +711,79 @@ to directly simulate Vercel's build conditions — it still compiled and
 succeeded, proving the build no longer touches the database under any
 circumstance. Pushed to GitHub; Vercel redeploys automatically on push to
 `main`.
+
+**Vercel runtime error: a corrupted env var, not a code bug.** Even with the
+force-dynamic fix deployed, `/overview` 500'd in production. Server-side
+error digging (browser console redacts server errors in production, so
+walked the user through Vercel's Logs UI, then a full JSON log export)
+surfaced the real cause: `TypeError: Cannot convert argument to a ByteString
+because the character at index 170 has a value of 8212 which is greater
+than 255` — Unicode 8212 is an em dash (—). Somewhere in copying the
+`production` branch's connection string into Vercel's env var field, a
+hyphen had been typographically substituted into an em dash, which Neon's
+HTTP driver can't send in a request header. Not a code issue; fixed by
+having the user delete and re-add the env var using Neon's own copy-icon
+button as the source (rather than manually selecting/copying text, which is
+where the substitution most likely happened) and redeploying.
+
+## Round 5: design polish, page by page — Overview
+
+The user identified four buckets of remaining work: page design/architecture,
+Beehiiv data fetching, LLM-based content analysis, and new features — and
+asked to go through them one at a time, page by page, starting with
+Overview's design. Their first message referenced two screenshots that
+didn't actually attach; flagged this and proceeded with the unambiguous
+parts of the request while waiting, then the user re-sent both images in a
+follow-up message that arrived mid-turn.
+
+Screenshot 1 confirmed the navbar's intended look (which mostly already
+matched: dark bar, serif wordmark, orange active-tab pill). Screenshot 2 was
+Beehiiv's own "Subscriber growth" chart — gradient-fill bars with a dashed
+overlaid line for a second metric, a clean light tooltip card (date header,
+colored-dot metric rows, a divider, then a post title/time row), and minimal
+start/end-only date labels on the x-axis.
+
+Changes made, all on the Overview page and shared Navbar:
+
+- Header logo: replaced the "Marketing Monk." text wordmark with the real
+  Beehiiv-hosted logo image (`next/image`, required adding
+  `media.beehiiv.com` to `next.config.ts`'s `images.remotePatterns`).
+- Nav tabs: inactive tabs set to bold + an ash gray (`text-muted`); active
+  tab keeps its orange pill with black text (already was).
+- Removed the redundant "Overview" title and "Trailing window · N editions ·
+  data source" caption line — the active navbar tab already communicates
+  which page you're on.
+- Rebuilt the Overview trend chart from two overlapping line polylines
+  (the user's core complaint: "very confusing") into gradient-fill bars for
+  open rate (mirroring Beehiiv's bar treatment) with CTR as a dotted overlay
+  line with visible point markers on every data point, not just on hover.
+  Simplified the x-axis to start/end date labels only. Rebuilt the tooltip
+  as a light card matching the reference: date, then Open rate and CTR as
+  colored-dot rows with right-aligned values, a divider, then the post
+  subject line as plain text — no click-through link this time (the user
+  explicitly said not to link to the edition here anymore) and no extra
+  fields, matching "post title, open rate, and CTR would be enough."
+  Removed the "Hover a date..." helper caption line per instruction.
+
+**Real bug found and fixed during verification, not by the user.** After
+making the nav tabs "ash gray," they rendered as rust-orange instead —
+`getComputedStyle` confirmed the color was `rgb(184, 66, 10)`, exactly
+`--color-link`, the global anchor-tag color rule. Root cause: that rule
+(`a { color: var(--color-link) }` in `globals.css`) was declared outside any
+Tailwind cascade layer, and unlayered CSS always wins over layered CSS
+(where Tailwind puts its own utility classes) regardless of specificity —
+so no `text-*` utility on any `<Link>` anywhere in the app had ever actually
+been able to override the default link color, a latent bug that simply
+hadn't been visually obvious until the tabs were deliberately changed to a
+color that clashed with it. Fixed by wrapping the rule in `@layer base`,
+which is the idiomatic Tailwind v4 fix — verified both directions
+afterward: the nav tabs now correctly show ash gray
+(`getComputedStyle` → `rgb(107, 114, 128)`, matching `text-muted`), and the
+edition detail page's "Top links clicked" list (which relies on that same
+default, having no explicit color class of its own) still correctly shows
+the rust link color, confirming the fix didn't break the one place that
+default was actually wanted.
+
+Verified the full page in the browser after all changes (logo, tab colors,
+removed header lines, new chart with working hover tooltip) and ran a full
+production build before committing.
