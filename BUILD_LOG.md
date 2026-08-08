@@ -984,3 +984,51 @@ Verified in the browser (screenshot matched against the reference, and
 `read_page`'s interactive-element list confirmed only the subject-line link
 appears per row, not four extra ones) and ran a full production build
 before committing.
+
+## Round 11: search and filters on Editions and Subject Line Lab
+
+The user asked for search + filters "across Editions, Subject Line Lab, and
+Retention" but only specified criteria for the first two (Editions: subject
+search, date-range/open-rate/CTR/quality filters; Subject Line Lab: subject
+search, hook-type/length/open-rate filters) — Retention wasn't detailed, so
+built the two specified pages now and left Retention for a follow-up once
+its filter criteria are given, rather than guessing.
+
+**Architecture choice:** client-side filtering over a fully server-fetched
+dataset, not URL-search-param-driven server filtering. With ~30-40 editions
+in the trailing window, there's no pagination/performance case for
+round-tripping to the server per keystroke, and instant, no-reload filtering
+is meaningfully better UX for a search box than a debounced server request.
+Each page's Server Component still does all the data fetching and
+score/label computation (quality score, hook-type label) as before, then
+hands a small serializable array of rows to a new Client Component
+(`EditionsExplorer`, `SubjectLineLabExplorer`) that owns the search/filter
+state via `useState` + `useMemo`.
+
+**Editions page** (`EditionsExplorer.tsx`): search box (subject substring
+match, case-insensitive) plus four filters — date range (native `<input
+type="date">` pair), open rate range, CTR range, content quality range (all
+min/max number-input pairs). A "N of M editions" counter and a "Clear
+filters" link (only shown when a filter is active) sit above the table. Row
+click-through behavior unchanged from before (every cell in a row links to
+the edition, matching this page's existing pattern — only Subject Line Lab
+was changed to single-column-clickable, not Editions).
+
+**Subject Line Lab page** (`SubjectLineLabExplorer.tsx`): same search box,
+plus hook-type filter as a row of toggleable pill buttons (multi-select,
+empty selection = show all types) rather than a dropdown, since there are
+only six hook types and toggle chips make active filters visually obvious
+at a glance. Length and open-rate range filters alongside it. The "Average
+open rate by hook type" summary card above stays fixed to the full,
+unfiltered dataset (a window-level aggregate, not something that should
+shift as someone searches/filters the row-level table below it) — only the
+table itself responds to search/filters, matching last round's
+single-column-clickable behavior.
+
+Verified interactively in the browser rather than just reading the code
+back: typed "Reddit" into Editions' search (correctly narrowed 38 -> 2,
+both real Reddit-related subject lines), set content-quality min to 85
+(narrowed to 7, every row actually >=85%, "Clear filters" appeared), and
+toggled the "Name-drop" hook-type chip on Subject Line Lab (narrowed to 8
+rows, all tagged Name-drop, matching the "(8)" count already shown in the
+aggregate card above). Ran a full production build before committing.

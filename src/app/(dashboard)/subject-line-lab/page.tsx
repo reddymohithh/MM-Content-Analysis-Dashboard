@@ -1,8 +1,11 @@
-import Link from "next/link";
 import { getAllEditions } from "@/lib/data/editions";
 import { computeHookTypeAverages, type InsightEdition } from "@/lib/scoring/insights";
 import { HOOK_TYPE_LABELS } from "@/lib/scoring/subject-line";
-import { Card, DataTable } from "@/components/dashboard/ui";
+import { Card } from "@/components/dashboard/ui";
+import {
+  SubjectLineLabExplorer,
+  type SubjectLineRow,
+} from "@/components/dashboard/SubjectLineLabExplorer";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +26,21 @@ export default async function SubjectLineLabPage() {
 
   const hookAverages = computeHookTypeAverages(insightEditions);
   const maxOpen = Math.max(...hookAverages.map((h) => h.avgOpenRate), 1);
+
+  const rows: SubjectLineRow[] = editions.map((e) => ({
+    id: e.id,
+    subject: e.subject,
+    hookType: e.hookType,
+    hookLabel: HOOK_TYPE_LABELS[e.hookType],
+    charLength: e.charLength,
+    hasNumber: e.hasNumber,
+    openRate: e.openRate,
+  }));
+
+  const hookTypeOptions = Object.entries(HOOK_TYPE_LABELS).map(([value, label]) => ({
+    value,
+    label,
+  }));
 
   return (
     <div>
@@ -50,38 +68,7 @@ export default async function SubjectLineLabPage() {
         </div>
       </Card>
 
-      <DataTable
-        columns={[
-          { label: "Subject line" },
-          { label: "Hook type" },
-          { label: "Length", align: "right" },
-          { label: "Number", align: "right" },
-          { label: "Open", align: "right" },
-        ]}
-      >
-        {editions.map((e) => (
-          <tr key={e.id} className="border-t border-hairline">
-            <td className="p-0">
-              <Link
-                href={`/editions/${e.id}`}
-                className="block px-3.5 py-2.5 text-[13px] font-semibold text-ink no-underline"
-              >
-                {e.subject}
-              </Link>
-            </td>
-            <td className="px-3.5 py-2.5 text-[12.5px] text-text-muted">
-              {HOOK_TYPE_LABELS[e.hookType]}
-            </td>
-            <td className="px-3.5 py-2.5 text-right font-mono text-[12px] text-text-muted">
-              {e.charLength} char
-            </td>
-            <td className="px-3.5 py-2.5 text-right text-[12.5px] text-text-muted">
-              {e.hasNumber ? "Yes" : "No"}
-            </td>
-            <td className="px-3.5 py-2.5 text-right text-[13px] text-ink">{e.openRate}%</td>
-          </tr>
-        ))}
-      </DataTable>
+      <SubjectLineLabExplorer rows={rows} hookTypes={hookTypeOptions} />
     </div>
   );
 }
