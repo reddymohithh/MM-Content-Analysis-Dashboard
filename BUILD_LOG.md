@@ -1136,3 +1136,10 @@ inputs (`px-2.5` both sides), which doesn't leave enough room for a native
 padding (`pl-2.5 pr-7`) instead of reusing the shared class, so the arrow
 now sits with breathing room from the edge. Verified visually in the
 browser and ran a full production build before committing.
+
+## Round 17: content width 1400px -> 1300px
+
+Another direct value from the user. Applied and verified the same way as
+the last two width rounds (live DOM measurement at a 2000px test viewport:
+navbar 2000px, content 1300px). Ran a full production build before
+committing.
