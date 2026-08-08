@@ -1143,3 +1143,17 @@ Another direct value from the user. Applied and verified the same way as
 the last two width rounds (live DOM measurement at a 2000px test viewport:
 navbar 2000px, content 1300px). Ran a full production build before
 committing.
+
+## Round 18: remove the width cap entirely
+
+Another annotated screenshot, this time with the bracket marks sitting
+almost flush against the viewport edges rather than a moderate margin —
+the opposite direction from the last three rounds' narrowing (1600 -> 1400
+-> 1300). Rather than guess another fixed pixel value from the annotation,
+read it as "trim the cap down to just the container's own padding" and
+removed the `max-w-[*]` constraint entirely, leaving only the layout's
+existing `px-8` (32px) padding as the margin. Verified by DOM measurement
+at a 2000px test viewport: content width 1936px, exactly 32px of margin on
+each side, matching the thin margins in the annotation far more closely
+than any of the fixed max-width values tried in Rounds 14-17. Ran a full
+production build before committing.
