@@ -45,6 +45,10 @@ export interface QualityScoreComponent {
 export interface QualityScoreResult {
   total: number;
   hasPoll: boolean;
+  /** False when the voice-compliance component is a placeholder rather than
+   * a real text-analysis pass — surface this via a Notices section, not
+   * inline in the component's own copy. */
+  voiceComputed: boolean;
   narrative: string;
   components: QualityScoreComponent[];
 }
@@ -124,7 +128,7 @@ export function computeQualityScore(input: QualityScoreInput): QualityScoreResul
     score: voiceScore,
     raw: voice.computed
       ? `Average sentence length ${voice.avgSentenceLength} words; ${voice.bannedPhraseHits} banned-phrase hit(s)`
-      : "Automated sentence-length and banned-phrase check (placeholder pending real text analysis, see BUILD_LOG.md)",
+      : "Automated sentence-length and banned-phrase check",
     benchmark: "Target: sentences under 20 words, zero banned-phrase hits",
   });
 
@@ -154,7 +158,7 @@ export function computeQualityScore(input: QualityScoreInput): QualityScoreResul
     why: whyFor(c.key, c.score),
   }));
 
-  return { total, hasPoll, narrative, components };
+  return { total, hasPoll, voiceComputed: voice.computed, narrative, components };
 }
 
 function whyFor(key: QualityScoreComponent["key"], score: number): string {

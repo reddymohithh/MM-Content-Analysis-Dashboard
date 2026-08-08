@@ -8,7 +8,7 @@ export function QualityDonuts({ result }: { result: QualityScoreResult }) {
     <div>
       <p className="mb-4 text-[13px] leading-relaxed">{result.narrative}</p>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="flex flex-col gap-3">
         {result.components.map((c) => (
           <div
             key={c.key}

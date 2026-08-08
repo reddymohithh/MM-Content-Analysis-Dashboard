@@ -870,3 +870,55 @@ compliance as its own card.
 Ran a full production build; committed locally (push still deferred per the
 user's "do everything locally, push once at the end" instruction from
 Round 6).
+
+## Round 8: edition-detail layout — vertical boxes, Notices, merged links
+
+Four more edition-detail-page requests:
+
+1. **Quality boxes vertical, not a 2x2 grid.** Changed `QualityDonuts`
+   from `grid-cols-2` to a single-column stack (`flex flex-col`), so the
+   four component boxes (Reader satisfaction, Engagement depth, Retention
+   signal, Writing/voice compliance) now run top to bottom.
+
+2. **No internal dev-notes in user-facing copy — a real mistake, not a
+   preference.** The voice-compliance box was literally rendering
+   "(placeholder pending real text analysis, see BUILD_LOG.md)" to end
+   users — a comment written for *this build log*, that had leaked into
+   product copy. Stripped that clause from `quality-score.ts`'s raw text,
+   added a `voiceComputed` flag to `QualityScoreResult`, and built a new
+   **Notices** section on the edition detail page: an orange-bordered card
+   (reusing the same warning-bg token as the "too early to flag" banner)
+   that lists this kind of caveat instead of burying it inline. Currently
+   surfaces the voice-compliance placeholder note, and — generically, for
+   future cases — a poll's `note` field when a poll was recorded but not
+   exactly tallied.
+
+3. **Merged Top links + Promoted lines into one list**, in one card under
+   one header ("Top links clicked"). Organic links still render as real
+   `<a>` tags (clickable, rust link color); promoted/sponsored links render
+   as plain, non-clickable rows with a small "Promoted" tag. First
+   implementation put that tag inside the row's `truncate`-ellipsis text
+   span, where it silently never rendered for any promoted line with a
+   description long enough to truncate (i.e. almost always) — caught this
+   during verification, not told by the user, by actually scrolling to a
+   real edition with sponsored placements rather than trusting the code
+   read-through. Fixed by moving the "Promoted" tag out to the row's
+   flex-shrink-0 right-hand cluster next to the click count, where it can't
+   get truncated away.
+
+4. **Comments moved into the slot the old "Promoted lines" card used to
+   occupy** (bottom-right, next to the merged links list), with the new
+   Notices card stacked below it in that same column. The poll chart, no
+   longer sharing its box with Comments, now fills that entire top-right
+   card alone.
+
+Noted but not changed (out of scope for this request): several real
+editions show a long run of near-duplicate "Sponsored placement" rows, one
+per `magic.beehiiv.com` redirect URL, since Beehiiv's per-link click data
+treats each subscriber-specific redirect as a distinct URL. Pre-existing
+behavior, not a regression from this merge — flagged to the user rather than
+silently changed.
+
+Verified every change in the browser against real synced data (including an
+edition with actual sponsored placements, specifically to catch the
+truncation bug above) and ran a full production build before committing.
