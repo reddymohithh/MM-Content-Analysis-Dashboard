@@ -1112,3 +1112,16 @@ result directly: resized the live browser to 2000px and measured the
 rendered DOM, confirming content now renders at 1600px centered (200px
 margin each side) versus the full viewport, a visibly wider but still
 margined layout. Ran a full production build before committing.
+
+The user reported no visible change and asked what the current px value
+was. Diagnosed via `window.innerWidth` on the live tab: it was 733px at
+that moment — far narrower than either the old 1120px or new 1600px cap, so
+the content was already filling 100% of available width in both cases and
+the change genuinely had no visible effect at that size. Explained this
+(the cap only matters once the window exceeds it) and flagged the
+mismatch with the earlier ~2000px-wide annotated screenshot, since the
+pane's width isn't staying fixed between interactions. The user then gave a
+direct value rather than another screenshot: bring 1600px down to 1400px.
+Applied and verified the same way as the previous two rounds (live DOM
+measurement at a 2000px test viewport: navbar 2000px, content 1400px). Ran
+a full production build before committing.

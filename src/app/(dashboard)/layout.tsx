@@ -12,7 +12,7 @@ export default function DashboardLayout({
         <Navbar />
       </Suspense>
       <div className="flex-1 overflow-y-auto px-8 py-5">
-        <div className="mx-auto w-full max-w-[1600px]">{children}</div>
+        <div className="mx-auto w-full max-w-[1400px]">{children}</div>
       </div>
     </div>
   );
