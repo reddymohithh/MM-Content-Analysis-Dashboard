@@ -949,3 +949,15 @@ relationship itself to be vertical too — donut on top, explanation below,
 within each box. Fixed by changing that inner container from `flex` (row)
 to `flex flex-col items-start` in `QualityDonuts.tsx`. Verified in the
 browser and rebuilt before committing.
+
+Two more quick follow-ups landed in quick succession right after: the user
+clarified that "vertical" was about each box's *internal* donut/explanation
+relationship, not the outer arrangement of the four boxes — those should be
+side by side after all. Changed the outer wrapper from `flex flex-col` back
+to `grid grid-cols-4`, keeping each individual box's internal `flex-col`
+layout from the previous fix. Then asked for the donut itself bigger and
+centered: bumped the SVG from 84px to 108px and changed each box's
+alignment from `items-start` to `items-center` (the explanation text below
+stays full-width and left-aligned regardless, since it has an explicit
+`w-full`). Verified in the browser after each change and ran a full
+production build before committing.

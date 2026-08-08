@@ -8,13 +8,13 @@ export function QualityDonuts({ result }: { result: QualityScoreResult }) {
     <div>
       <p className="mb-4 text-[13px] leading-relaxed">{result.narrative}</p>
 
-      <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-4 gap-3">
         {result.components.map((c) => (
           <div
             key={c.key}
-            className="flex flex-col items-start gap-3 rounded-[10px] border border-border bg-card-soft p-3.5"
+            className="flex flex-col items-center gap-3 rounded-[10px] border border-border bg-card-soft p-3.5"
           >
-            <svg width={84} height={84} viewBox="0 0 100 100" className="flex-shrink-0">
+            <svg width={108} height={108} viewBox="0 0 100 100" className="flex-shrink-0">
               <circle cx={50} cy={50} r={R} fill="none" stroke="var(--color-border)" strokeWidth={9} />
               <circle
                 cx={50}
