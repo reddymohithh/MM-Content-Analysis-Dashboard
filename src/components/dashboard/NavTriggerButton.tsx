@@ -5,34 +5,41 @@ import { useRouter } from "next/navigation";
 
 type Status = "idle" | "running" | "done" | "error";
 
-export function ContentQualityRefreshButton() {
+export function NavTriggerButton({
+  idleLabel,
+  runningLabel,
+  endpoint,
+  title,
+  formatResult,
+}: {
+  idleLabel: string;
+  runningLabel: string;
+  endpoint: string;
+  title: string;
+  /** Given the parsed JSON response body, return the message to show. */
+  formatResult: (data: Record<string, unknown>) => string;
+}) {
   const router = useRouter();
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState<string | null>(null);
 
-  async function runRefresh() {
+  async function run() {
     setStatus("running");
     setMessage(null);
     try {
-      const res = await fetch("/api/content-quality/refresh", { method: "POST" });
+      const res = await fetch(endpoint, { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
         setStatus("error");
-        setMessage(data.error ?? "Refresh failed.");
+        setMessage(data.error ?? "Request failed.");
         return;
       }
       setStatus("done");
-      setMessage(
-        data.scored > 0
-          ? `Scored ${data.scored} edition${data.scored === 1 ? "" : "s"}${
-              data.errors?.length ? `, ${data.errors.length} failed` : ""
-            }.`
-          : "All editions already scored.",
-      );
+      setMessage(formatResult(data));
       router.refresh();
     } catch {
       setStatus("error");
-      setMessage("Refresh failed — check the server logs.");
+      setMessage("Request failed — check the server logs.");
     }
   }
 
@@ -40,15 +47,15 @@ export function ContentQualityRefreshButton() {
     <div className="relative flex-shrink-0">
       <button
         type="button"
-        onClick={runRefresh}
+        onClick={run}
         disabled={status === "running"}
         className="flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-text-faint/40 px-3 py-1.5 text-[12px] font-medium text-text-faint transition-colors hover:text-cream disabled:opacity-50"
-        title="Analyze new editions for content quality (requires local API keys)"
+        title={title}
       >
         <span className={status === "running" ? "inline-block animate-spin" : "inline-block"}>
           ↻
         </span>
-        {status === "running" ? "Analyzing…" : "Analyze content"}
+        {status === "running" ? runningLabel : idleLabel}
       </button>
       {message && (
         <div

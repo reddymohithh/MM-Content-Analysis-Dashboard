@@ -1409,3 +1409,96 @@ modified even though it clearly had new content in it. Fixed with a `!
 now actually stages, and confirmed its contents hold no real secrets (every
 value blank except the already-public publication ID and non-sensitive
 default config) before letting it into a public repo for the first time.
+
+## Round 25: manual "Fetch" trigger button, and a real PII/crash bug it surfaced
+
+**The ask.** Both data-changing actions in the app — pulling new editions
+from Beehiiv, and running the LLM content-quality pass on them — needed to
+be strictly manual, never automatic, and each should only ever touch *new*
+work: fetch shouldn't re-download things it already has, and analyze
+shouldn't re-score editions that already have a score. The dedup logic for
+scoring already existed (Round 24's refresh route only ever selects
+editions with no `content_quality_scores` row). What didn't exist yet was
+any way to trigger the Beehiiv sync itself without dropping to a terminal
+and running `npm run seed:beehiiv` — that script was CLI-only.
+
+I also raised, as an open question rather than a decision: should "Analyze
+content" additionally be locked to once per day? My recommendation was
+against it — the existing skip-already-scored logic already prevents
+redundant LLM spend on repeated clicks, so a time-lock would add UI
+complexity (state, unlock timers, an admin override for a legitimate
+same-day re-run) without buying additional protection over what dedup
+already provides. Whether the actual worry was cost control or someone
+else on the team spamming the button changes the right answer, so this is
+left open pending clarification rather than built preemptively.
+
+**What shipped.**
+
+1. **Shared sync logic.** The Beehiiv-pull logic that used to live only in
+   `scripts/seed-from-beehiiv.ts` moved to `src/lib/beehiiv/sync.ts`
+   (`syncBeehiivData()`), with the CLI script reduced to a three-line
+   wrapper that imports and calls it. One implementation, two triggers —
+   the same principle already used for the content-quality scoring route.
+   Hit one real snag doing this: the extracted module initially had
+   `import "server-only"` at the top (copied out of habit from the rest of
+   the `src/lib` tree), which threw immediately when the CLI script tried
+   to load it with plain `tsx` outside Next.js's bundler. Removed the
+   import — this module has to run in both a Next.js API route and a bare
+   Node script, so it can't assume either environment.
+
+2. **New route:** `POST /api/beehiiv/refresh`
+   (`src/app/api/beehiiv/refresh/route.ts`) — guards on
+   `DATABASE_URL`/`BEEHIIV_API_KEY`/`BEEHIIV_PUBLICATION_ID` being set,
+   calls `syncBeehiivData()`, returns `{ synced, removed, skippedForPlatform,
+   messages }` or a clear `{ error }`. `maxDuration = 300` since a full
+   31-edition sync (each edition requires walking that edition's poll
+   responses) took over 4 minutes end-to-end through the browser.
+
+3. **Generic `NavTriggerButton`** replaced the single-purpose
+   `ContentQualityRefreshButton` from Round 24, since the navbar now needed
+   two near-identical buttons (idle/running label, an endpoint to POST to,
+   a result formatter). Both "Fetch" and "Analyze content" now render side
+   by side in the navbar as independent, separately-clickable actions —
+   exactly the "both manual, both separate" requirement — each with its
+   own inline success/error popover and a `router.refresh()` on success so
+   any open page picks up new data immediately.
+
+**A real bug the first live test caught — not a flake.** The first click
+of the new "Fetch" button failed after 2.5 minutes with a 500. The error
+(visible in the response body, not the server console — the route's catch
+block wasn't logging it) was a Postgres insert failure on `promoted_links`,
+and reading the actual query params revealed something worth stopping for:
+Beehiiv's per-click breakdown for "magic"/sponsored links isn't an
+aggregate URL, it's a *personalized tracking link containing the
+subscriber's own email address* as a query parameter
+(`?email=someone@domain.com&redirect_to=...`). The existing sync code was
+building each `promoted_links.id` as `post-id + "-promoted-" + that_url`,
+sliced to 250 characters — so two different subscribers' personalized
+links for the same sponsor link were colliding after truncation and
+tripping the primary key.
+
+Before patching the crash, checked whether this table was even used:
+`grep` across `src/app` and `src/components` confirmed `promotedLinks` is
+fetched into the data layer (`src/lib/data/editions.ts`) but never rendered
+anywhere — consistent with the "remove promoted or sponsored placement
+links completely" instruction from an earlier round, which stripped it
+from the UI but left the sync still faithfully writing it to the database
+underneath. So the fix wasn't a workaround for the truncation collision;
+it was to stop the sync from ever populating `promoted_links` at all —
+"magic" links are now skipped in the same branch as the already-skipped
+"social"/"audio" clicks. This simultaneously fixes the crash, deletes dead
+write-only code, and — the part that actually mattered — stops a local dev
+database from accumulating real subscriber email addresses for a feature
+nobody sees. The `promoted_links` table itself and its schema/type
+plumbing were left in place (unused, harmless) rather than torn out in the
+same pass as a bug fix.
+
+**Verified in the browser, not just by log-tailing.** Re-ran "Fetch" after
+the fix: it sailed straight past the edition that previously crashed and
+completed all 31 editions in ~4.4 minutes, surfacing "Synced 31 editions."
+in the navbar popover. Clicked "Analyze content" immediately after — it
+correctly failed fast with "OPENAI_API_KEY is not set — can't run
+content-quality scoring" (that key still isn't configured, by design, per
+Round 24), rendered in a visually distinct red error popover next to the
+neutral gray success one for Fetch. `npx tsc --noEmit` clean after the
+fix.
