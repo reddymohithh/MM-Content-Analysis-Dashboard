@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { SITE_AUTH_COOKIE, computeSiteAuthToken, verifySitePassword } from "@/lib/site-auth";
+import { SITE_AUTH_COOKIE, computeAuthToken, verifySitePassword } from "@/lib/site-auth";
 
 export async function POST(request: NextRequest) {
   const formData = await request.formData();
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.redirect(url, { status: 303 });
   }
 
-  const token = await computeSiteAuthToken(password);
+  const token = await computeAuthToken(password);
   const response = NextResponse.redirect(new URL(next, request.url), { status: 303 });
   response.cookies.set(SITE_AUTH_COOKIE, token, {
     httpOnly: true,

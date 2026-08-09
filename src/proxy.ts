@@ -1,21 +1,18 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { SITE_AUTH_COOKIE, computeSiteAuthToken } from "@/lib/site-auth";
+import { SITE_AUTH_COOKIE, getCurrentAuthToken } from "@/lib/site-auth";
 
 export async function proxy(request: NextRequest) {
-  const password = process.env.SITE_PASSWORD;
-
-  // No password configured (e.g. local dev without .env.local set up yet) —
-  // gate is a no-op rather than locking the developer out.
-  if (!password) return NextResponse.next();
-
   const { pathname } = request.nextUrl;
   if (pathname.startsWith("/login") || pathname.startsWith("/api/site-auth")) {
     return NextResponse.next();
   }
 
-  const cookie = request.cookies.get(SITE_AUTH_COOKIE)?.value;
-  const expected = await computeSiteAuthToken(password);
+  // No password configured anywhere (env var or DB) — gate is a no-op
+  // rather than locking the developer out.
+  const expected = await getCurrentAuthToken();
+  if (expected === null) return NextResponse.next();
 
+  const cookie = request.cookies.get(SITE_AUTH_COOKIE)?.value;
   if (cookie === expected) return NextResponse.next();
 
   const loginUrl = new URL("/login", request.url);

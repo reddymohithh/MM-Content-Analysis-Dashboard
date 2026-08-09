@@ -1,17 +1,16 @@
 import { cookies } from "next/headers";
 import { Suspense } from "react";
 import { Navbar } from "@/components/dashboard/Navbar";
-import { SITE_AUTH_COOKIE, computeSiteAuthToken } from "@/lib/site-auth";
+import { SITE_AUTH_COOKIE, getCurrentAuthToken } from "@/lib/site-auth";
 
-// If no SITE_PASSWORD is configured, the gate is off (see proxy.ts) and
-// "logged in/out" isn't a meaningful concept — the navbar shows neither
-// button rather than one that wouldn't do anything.
+// If the gate is fully off (see proxy.ts — no password set via env var or
+// change-password, ever), "logged in/out" isn't a meaningful concept — the
+// navbar shows neither button rather than one that wouldn't do anything.
 async function getAuthButton(): Promise<"login" | "logout" | null> {
-  const password = process.env.SITE_PASSWORD;
-  if (!password) return null;
+  const expected = await getCurrentAuthToken();
+  if (expected === null) return null;
   const cookieStore = await cookies();
   const cookie = cookieStore.get(SITE_AUTH_COOKIE)?.value;
-  const expected = await computeSiteAuthToken(password);
   return cookie === expected ? "logout" : "login";
 }
 

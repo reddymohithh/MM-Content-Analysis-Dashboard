@@ -15,6 +15,13 @@
       "when": 1786260799390,
       "tag": "0001_mean_night_nurse",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786269182536,
+      "tag": "0002_chunky_brood",
+      "breakpoints": true
     }
   ]
 }

@@ -1549,3 +1549,71 @@ lands back on `/login`; (c) with `SITE_PASSWORD` blank again (the normal
 local-dev state), the navbar shows neither button, unchanged from before
 this round. `npx tsc --noEmit`, `eslint`, and `next build` all clean; the
 new `/api/site-auth/logout` route shows up correctly in the build output.
+
+## Round 27: dropdown menu — sign out + change password
+
+The single "Log out" button became an "Account ▾" dropdown with two
+options: "Change password" and "Sign out." The second one is a real
+architecture change, not just UI: the password only ever lived in
+`SITE_PASSWORD`, an env var, and a running Vercel deployment can't rewrite
+its own env vars at request time — there was nowhere to persist a changed
+password to. Asked the user how much of that tradeoff to take on, since it
+affects every single page load, not just the auth pages:
+
+- **DB-backed with a 60s in-memory cache (what shipped).** The password
+  moves into Neon (new singleton table, `site_auth_settings`, one row).
+  `proxy.ts` — which runs on every request — checks a module-level cache
+  first and only re-queries Neon when it's stale, so a password change
+  takes up to a minute to take effect but normal page loads pay no added
+  latency most of the time.
+- Rejected alternatives: querying Neon on literally every request (correct
+  instantly, but a database round-trip on every page view forever); or
+  keeping "change password" purely local (`.env.local` only, real deploy
+  still edited by hand in the Vercel dashboard) — simplest, but the button
+  wouldn't do anything real on the actual portfolio site, which is the one
+  place this password gate exists for.
+
+**What shipped:**
+
+1. **`site_auth_settings` table** (`src/lib/db/schema.ts`, migration
+   `drizzle/0002_chunky_brood.sql`, pushed to the local `local-real` Neon
+   branch only — the production branch needs the same `drizzle-kit push`
+   run against it before this feature works on the deployed site). One
+   column that does double duty: `auth_token` is both the valid
+   session-cookie value *and* what a login/change-password attempt's
+   candidate password is compared against (same one-way SHA-256 formula as
+   before) — the plaintext password itself is never stored anywhere.
+
+2. **`src/lib/site-auth.ts` rewritten** around `getCurrentAuthToken()`:
+   checks the in-memory cache, then Neon (via a dynamic `import("@/lib/db")`
+   so the module doesn't hard-require `DATABASE_URL` at import time — this
+   file loads on every request through `proxy.ts`, including the supported
+   "no database at all, synthetic demo data" mode), then falls back to
+   `SITE_PASSWORD`. `changeSitePassword()` upserts the new token and primes
+   the cache immediately so the response that changes the password can
+   reissue the requester's own cookie in the same round trip — otherwise
+   changing your own password would instantly log you out.
+
+3. **`POST /api/site-auth/change-password`** and a new **`/change-password`**
+   page (styled to match `/login`, protected by `proxy.ts` like any other
+   dashboard route since it isn't in the login/site-auth exemption list):
+   requires the current password, rejects new passwords under 4 characters,
+   and reuses `verifySitePassword` so a wrong current password gets the
+   same clear error `/login` gives for a wrong password.
+
+4. **`AuthMenu.tsx`** (new component): a small click-outside-to-close
+   dropdown, "Change password" as a link, "Sign out" as the existing
+   cookie-clearing form submit, both styled to match the navbar's other
+   buttons.
+
+**Verified the full loop live**, not just the individual pieces: logged in
+with a temporary test password (`.env.local`, restored immediately after,
+never committed), opened the dropdown, changed the password through the
+real form, confirmed the session stayed logged in through the change
+(cookie reissue worked), signed out, confirmed the *old* password was
+rejected at `/login`, confirmed the *new* one worked, then deleted the test
+row from the local database and restarted the dev server to confirm local
+dev's normal gate-off state (blank `SITE_PASSWORD`, no DB override) was
+completely unaffected. `npx tsc --noEmit`, `eslint`, and `next build` all
+clean; `/change-password` and `/api/site-auth/change-password` both show
+up correctly in the build output.

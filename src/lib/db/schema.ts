@@ -10,6 +10,21 @@ import {
 import { relations } from "drizzle-orm";
 
 /**
+ * Singleton row (id is always "default") holding the current site-auth
+ * token, so the shared dashboard password can be changed at runtime — env
+ * vars can't be rewritten by a running Vercel deployment. See
+ * src/lib/site-auth.ts. Only created the first time "change password" is
+ * used; until then SITE_PASSWORD (env var) is authoritative.
+ */
+export const siteAuthSettings = pgTable("site_auth_settings", {
+  id: text("id").primaryKey(),
+  authToken: text("auth_token").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+/**
  * One row per Beehiiv publication snapshot (rolling-window stats), captured on
  * each sync. Multiple rows accumulate a history; the app reads the latest one.
  */
