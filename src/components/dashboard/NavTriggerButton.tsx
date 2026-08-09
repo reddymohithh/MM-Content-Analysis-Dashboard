@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+
+const MESSAGE_DISPLAY_MS = 4000;
 
 type Status = "idle" | "running" | "done" | "error";
 
@@ -22,24 +24,38 @@ export function NavTriggerButton({
   const router = useRouter();
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState<string | null>(null);
+  const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (dismissTimer.current) clearTimeout(dismissTimer.current);
+    };
+  }, []);
+
+  function showMessage(text: string) {
+    setMessage(text);
+    if (dismissTimer.current) clearTimeout(dismissTimer.current);
+    dismissTimer.current = setTimeout(() => setMessage(null), MESSAGE_DISPLAY_MS);
+  }
 
   async function run() {
     setStatus("running");
+    if (dismissTimer.current) clearTimeout(dismissTimer.current);
     setMessage(null);
     try {
       const res = await fetch(endpoint, { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
         setStatus("error");
-        setMessage(data.error ?? "Request failed.");
+        showMessage(data.error ?? "Request failed.");
         return;
       }
       setStatus("done");
-      setMessage(formatResult(data));
+      showMessage(formatResult(data));
       router.refresh();
     } catch {
       setStatus("error");
-      setMessage("Request failed — check the server logs.");
+      showMessage("Request failed — check the server logs.");
     }
   }
 

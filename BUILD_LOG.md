@@ -1502,3 +1502,11 @@ content-quality scoring" (that key still isn't configured, by design, per
 Round 24), rendered in a visually distinct red error popover next to the
 neutral gray success one for Fetch. `npx tsc --noEmit` clean after the
 fix.
+
+**Follow-up:** the result popover (e.g. "Synced 31 editions.") stuck around
+indefinitely until the next click, which read as broken/stuck UI rather
+than a one-off confirmation. `NavTriggerButton` now auto-dismisses it via
+`setTimeout` 4 seconds after it appears (cleared and restarted on every new
+click, and cleaned up on unmount) — success and error messages both behave
+the same way. Verified via direct DOM inspection in the browser: the
+popover is present immediately after a click and gone by 4.5s.
