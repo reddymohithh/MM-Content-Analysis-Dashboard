@@ -14,8 +14,9 @@
 
 import type { HookType } from "./subject-line";
 import { HOOK_TYPE_LABELS } from "./subject-line";
+import type { Audience } from "./quality-score";
 
-export type Audience = "blended" | "batch1" | "batch2";
+export type { Audience };
 
 export interface InsightEdition {
   id: string;

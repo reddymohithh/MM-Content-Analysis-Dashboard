@@ -1219,3 +1219,82 @@ reintroducing a `max-w-*` cap, since that whole approach had just been
 reverted at the user's request. Verified via computed-style check
 (`paddingLeft`/`paddingRight` = 48px) and a screenshot. Ran a full
 production build before committing.
+
+## Round 23: Overview chart margins, date-field color match, lens buttons moved into edition detail
+
+Three requests across three pages.
+
+**Overview chart — a real bug, not a padding issue.** The user reported
+large empty space on both sides of the OR vs CTR bars. Investigated rather
+than just nudging padding numbers: the `<svg>` had `width="100%"` with a
+fixed `viewBox="0 0 1120 240"` and no `preserveAspectRatio` override, so it
+defaulted to `xMidYMid meet` — which locks the viewBox's aspect ratio
+(1120:240) and letterboxes horizontally whenever the actual container is
+wider than that ratio implies. As the page got wider over the last several
+rounds, this letterboxing became the "empty space" the user was seeing; it
+had been there since the chart was first built; it just wasn't visually
+obvious back when the container was closer to 1120px itself. Fixed with
+`preserveAspectRatio="none"`, letting the SVG stretch to fill its actual
+container width. Verified with a screenshot: bars now run edge to edge.
+
+**Editions date-range field color.** The `dd/mm/yyyy` date inputs and the
+Min/Max number inputs shared one class with no explicit color, so the date
+segments rendered in the default ink color while the Min/Max fields showed
+their *placeholder* text in the browser's own default gray — visibly
+different grays. Split into two classes: `numberCls` gets an explicit
+`placeholder:text-text-faint` (real typed values stay ink-colored, only the
+placeholder is faint), and a new `dateCls` sets the date input's base
+`color` to `text-faint` directly, since native date inputs display
+`dd/mm/yyyy` via the real `color` property, not a `::placeholder`
+pseudo-element — there's no way to distinguish "empty" from "filled" state
+for a date input via CSS alone, so a real selected date will also render in
+the faint color, a reasonable tradeoff given the constraint. Verified via
+`getComputedStyle` on both input types: date = `rgb(154, 146, 132)`
+(`--color-text-faint`), matching the intent.
+
+**Audience lens buttons moved out of the navbar into the edition detail
+page, and made to actually affect the quality score.** Removed
+Blended/Batch 1/Batch 2 entirely from `Navbar.tsx` (along with the
+route-based locking/dimming logic, no longer needed once the buttons don't
+live somewhere they could be clicked from the wrong page) and built a new
+`AudienceLensButtons` client component, rendered directly inside the "Why
+this edition scored X% content quality" card's header row, right-aligned
+next to the heading on the same line. It reads/writes the same
+`?audience=` URL param the page already used for the Tips section, so nav
+away and back preserves nothing new architecturally — just relocated where
+the control lives.
+
+The more substantial part: the user explicitly asked that changing audience
+affect *both* the Tips section (already audience-aware) *and* the quality
+score explanation, which it didn't before — the numeric score and its "why"
+text were audience-invariant. Added an optional `audience` field to
+`computeQualityScore`'s input and threaded it through: the numeric score,
+weights, and component scores stay exactly the same real numbers regardless
+of audience (still blended, real data — not fabricated per-audience
+numbers, consistent with how the audience lens has been described
+throughout this project as an editorial reframing, not a data
+segmentation), but the top-level narrative sentence and each component's
+"why" text now render in practitioner-framed (Batch 1) or leadership-framed
+(Batch 2) language when that lens is active, mirroring the tone already
+established in `generateEditionTips`. Consolidated the `Audience` type to
+live in `quality-score.ts` and re-exported it from `insights.ts` rather than
+maintaining two duplicate definitions.
+
+Hit a real debugging detour verifying this: clicking the relocated lens
+buttons appeared to do nothing, and the console showed a `PageTitle is not
+defined` error plus a syntax error at a line that didn't match the current
+file — both stale leftovers from earlier mid-edit states in this same dev
+server session (one from before Round 21 removed `PageTitle` from
+Retention, one from a moment mid-edit this round when a `</Card>` tag got
+dropped). Restarting the dev server and clearing `.next` didn't fix it
+either — the same stale errors persisted with an identical error digest,
+which turned out to be because the *browser tab* itself was stuck (its
+HMR WebSocket had died and it was holding onto a crashed React error
+overlay from a previous compile). A fresh tab against the same running
+server loaded clean with no errors, confirming the code was fine and this
+was a Browser-pane-tab-state issue, not an app bug. Re-verified the actual
+feature there: clicking Batch 1 updated the URL to `?audience=batch1` and
+both the quality narrative/why-text and the Tips section changed together,
+confirming the fix worked correctly.
+
+Ran a full production build and closed the stale tab before committing.

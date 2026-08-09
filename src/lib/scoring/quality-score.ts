@@ -11,6 +11,8 @@
  * other three components rather than defaulting to a neutral placeholder.
  */
 
+export type Audience = "blended" | "batch1" | "batch2";
+
 export interface QualityScoreInput {
   id: string;
   ctrOverall: number; // percent, e.g. 0.79
@@ -28,6 +30,14 @@ export interface QualityScoreInput {
     /** false until a real text-analysis pass replaces this placeholder */
     computed: boolean;
   };
+  /**
+   * Which audience lens to narrate the score through. Only the narrative and
+   * each component's "why" text change per audience — the underlying scores
+   * and weights are the same real, blended numbers regardless of lens; this
+   * is an editorial reframing, not a different data segmentation (see
+   * docs/02_beehiiv_data_audit.md's "audience lens" definition).
+   */
+  audience?: Audience;
 }
 
 export interface QualityScoreComponent {
@@ -58,6 +68,7 @@ const DEFAULT_VOICE = { avgSentenceLength: 18, bannedPhraseHits: 0, computed: fa
 export function computeQualityScore(input: QualityScoreInput): QualityScoreResult {
   const hasPoll = !!input.poll && input.poll.total > 0;
   const voice = input.voice ?? DEFAULT_VOICE;
+  const audience = input.audience ?? "blended";
 
   const satisfactionScore = hasPoll
     ? Math.round(((input.poll!.lovedIt + input.poll!.prettyUseful) / input.poll!.total) * 100)
@@ -142,9 +153,16 @@ export function computeQualityScore(input: QualityScoreInput): QualityScoreResul
     if (points < worst.score * worst.weight) worst = c;
   }
 
+  const audienceLabel =
+    audience === "batch1" ? "practitioners" : audience === "batch2" ? "leadership readers" : null;
+
   const narrative = hasPoll
-    ? `This edition scored ${total}%, weighted mostly on engagement and retention with a smaller poll component. The biggest positive driver was ${best.name.toLowerCase()}. The biggest drag was ${worst.name.toLowerCase()}.`
-    : `This edition scored ${total}%. No poll responses came in, so the score leans fully on engagement, retention, and voice rather than reader ratings.`;
+    ? audienceLabel
+      ? `For ${audienceLabel}, this edition scored ${total}%, weighted mostly on engagement and retention with a smaller poll component. The strongest driver was ${best.name.toLowerCase()}. The weakest was ${worst.name.toLowerCase()}.`
+      : `This edition scored ${total}%, weighted mostly on engagement and retention with a smaller poll component. The biggest positive driver was ${best.name.toLowerCase()}. The biggest drag was ${worst.name.toLowerCase()}.`
+    : audienceLabel
+      ? `For ${audienceLabel}, this edition scored ${total}%. No poll responses came in, so the score leans fully on engagement, retention, and voice rather than reader ratings.`
+      : `This edition scored ${total}%. No poll responses came in, so the score leans fully on engagement, retention, and voice rather than reader ratings.`;
 
   const components: QualityScoreComponent[] = parts.map((c) => ({
     key: c.key,
@@ -155,13 +173,49 @@ export function computeQualityScore(input: QualityScoreInput): QualityScoreResul
     dashArrayFraction: c.score / 100,
     raw: c.raw,
     benchmark: c.benchmark,
-    why: whyFor(c.key, c.score),
+    why: whyFor(c.key, c.score, audience),
   }));
 
   return { total, hasPoll, voiceComputed: voice.computed, narrative, components };
 }
 
-function whyFor(key: QualityScoreComponent["key"], score: number): string {
+function whyFor(key: QualityScoreComponent["key"], score: number, audience: Audience): string {
+  if (audience === "batch1") {
+    switch (key) {
+      case "sat":
+        return score >= 65
+          ? "Practitioners rated this useful — the tactical takeaway landed."
+          : "Practitioners flagged this as less immediately useful than usual.";
+      case "eng":
+        return score >= 70
+          ? "Practitioners clicked through for the how-to at or above the recent normal."
+          : "Practitioners clicked through less than usual — may be missing a concrete, same-day action.";
+      case "ret":
+        return score >= 70
+          ? "This practitioner-facing send isn't driving unsubscribes, a good sign."
+          : "Unsubscribe rate ran hotter than usual for a practitioner-facing send.";
+      default:
+        return "Sentence length and banned-phrase checks ran against the locked voice spec, weighed for a tactical, same-day-actionable tone.";
+    }
+  }
+  if (audience === "batch2") {
+    switch (key) {
+      case "sat":
+        return score >= 65
+          ? "Leadership readers responded well to the strategic framing."
+          : "Leadership readers rated this lower than usual — may be reading as too tactical.";
+      case "eng":
+        return score >= 70
+          ? "Leadership readers engaged with the category-level angle at or above the recent normal."
+          : "Leadership engagement lagged — may need a sharper budget or category-level hook.";
+      case "ret":
+        return score >= 70
+          ? "This leadership-facing send isn't driving unsubscribes, a good sign."
+          : "Unsubscribe rate ran hotter than usual for a leadership-facing send.";
+      default:
+        return "Sentence length and banned-phrase checks ran against the locked voice spec, weighed for a strategic, leadership-facing tone.";
+    }
+  }
   switch (key) {
     case "sat":
       return score >= 65

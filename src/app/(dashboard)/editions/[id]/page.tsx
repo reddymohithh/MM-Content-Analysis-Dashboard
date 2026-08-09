@@ -7,6 +7,7 @@ import { usDate } from "@/lib/format";
 import { StatCard, GradientStatCard, Card, Eyebrow, EmptyState } from "@/components/dashboard/ui";
 import { PollChart } from "@/components/dashboard/PollChart";
 import { QualityDonuts } from "@/components/dashboard/QualityDonuts";
+import { AudienceLensButtons } from "@/components/dashboard/AudienceLensButtons";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,7 @@ export default async function EditionDetailPage({
     trailingAvgUnsub: avgUnsub,
     poll: edition.poll,
     voice: edition.voice,
+    audience,
   });
   const flaggable = canFlag(edition.publishedAt);
   const tips = generateEditionTips(edition, audience, avgCtr);
@@ -92,7 +94,12 @@ export default async function EditionDetailPage({
       </div>
 
       <Card className="mb-4">
-        <Eyebrow>Why this edition scored {quality.total}% content quality</Eyebrow>
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <div className="font-mono text-[11px] uppercase tracking-wide text-heading-soft">
+            Why this edition scored {quality.total}% content quality
+          </div>
+          <AudienceLensButtons />
+        </div>
         <QualityDonuts result={quality} />
       </Card>
 

@@ -63,7 +63,13 @@ export function OverviewChart({ editions }: { editions: ChartEdition[] }) {
       </div>
 
       <div className="relative">
-        <svg width="100%" height={CHART_H} viewBox={`0 0 ${CHART_W} ${CHART_H}`} style={{ overflow: "visible" }}>
+        <svg
+          width="100%"
+          height={CHART_H}
+          viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+          preserveAspectRatio="none"
+          style={{ overflow: "visible" }}
+        >
           <defs>
             <linearGradient id="openRateBarFill" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="var(--color-orange)" stopOpacity={0.85} />

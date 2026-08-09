@@ -17,7 +17,9 @@ export interface EditionRow {
 const inputCls =
   "w-full rounded-lg border border-border bg-card px-3 py-2 text-[13px] outline-none focus:border-orange";
 const numberCls =
-  "w-full rounded-lg border border-border bg-card px-2.5 py-1.5 text-[12.5px] outline-none focus:border-orange";
+  "w-full rounded-lg border border-border bg-card px-2.5 py-1.5 text-[12.5px] outline-none placeholder:text-text-faint focus:border-orange";
+const dateCls =
+  "w-full rounded-lg border border-border bg-card px-2.5 py-1.5 text-[12.5px] text-text-faint outline-none focus:border-orange";
 
 function RangeField({
   label,
@@ -124,14 +126,14 @@ export function EditionsExplorer({ editions }: { editions: EditionRow[] }) {
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className={numberCls}
+                className={dateCls}
               />
               <span className="text-text-faint">–</span>
               <input
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className={numberCls}
+                className={dateCls}
               />
             </div>
           </div>
