@@ -1208,3 +1208,14 @@ just reaching Retention last: removed the "Retention / Unsubscribe and
 spam trend..." title and caption block. Verified via `get_page_text` that
 the page now goes straight from the navbar into the stat cards, and ran a
 full production build before committing.
+
+## Round 22: a little more side margin, without reopening the width thread
+
+Distinct from Rounds 14-20's fixed max-width saga: this time the ask was
+just "move everything a little inward" — modest, uniform breathing room on
+both sides, not a specific width target. Increased the layout's side
+padding from `px-8` (32px) to `px-12` (48px), deliberately not
+reintroducing a `max-w-*` cap, since that whole approach had just been
+reverted at the user's request. Verified via computed-style check
+(`paddingLeft`/`paddingRight` = 48px) and a screenshot. Ran a full
+production build before committing.
