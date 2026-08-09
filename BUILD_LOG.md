@@ -1510,3 +1510,42 @@ than a one-off confirmation. `NavTriggerButton` now auto-dismisses it via
 click, and cleaned up on unmount) — success and error messages both behave
 the same way. Verified via direct DOM inspection in the browser: the
 popover is present immediately after a click and gone by 4.5s.
+
+## Round 26: Log in / Log out buttons in the navbar
+
+The navbar had no visible way to end a session — the only way to "log out"
+was to manually clear the `mm_site_auth` cookie in devtools. Added a real
+logout path and made the navbar auth-state-aware:
+
+1. **`POST /api/site-auth/logout`** (`src/app/api/site-auth/logout/route.ts`)
+   clears the `mm_site_auth` cookie and redirects to `/login`. `proxy.ts`
+   already exempts everything under `/api/site-auth` from the gate (prefix
+   match), so this needed no proxy change.
+
+2. **`(dashboard)/layout.tsx` became async** and now computes which auth
+   button (if any) the navbar should show, server-side, by reading the
+   cookie via `next/headers` and comparing it against the expected token —
+   the same check `proxy.ts` does. Three states: no `SITE_PASSWORD`
+   configured → `null` (gate is off; "logged in/out" isn't a meaningful
+   concept locally, so neither button renders — showing "Log out" with
+   nothing to log out of would just be confusing). Password set and cookie
+   valid → `"logout"`. Password set and cookie missing/stale → `"login"`
+   (a link to `/login`; in practice unreachable while the gate is on, since
+   `proxy.ts` redirects before the navbar ever renders, but it's the
+   correct fallback rather than an assumption baked into the UI).
+
+3. **`Navbar`** now takes an `authButton` prop and renders a "Log out"
+   button (a plain `<form method="POST">` — a real navigation, no client
+   JS needed for something this low-stakes) or a "Log in" link, styled to
+   match the existing Fetch/Analyze content buttons.
+
+**Verified all three states in the browser**, not just by reading the
+code: temporarily set a real `SITE_PASSWORD` in `.env.local` (local file,
+git-ignored, restored to blank immediately after) and restarted the dev
+server. Confirmed (a) with the gate on and no cookie, `/overview` 307s to
+`/login` before the navbar ever renders; (b) after submitting the
+password, the navbar shows "Log out" and clicking it clears the cookie and
+lands back on `/login`; (c) with `SITE_PASSWORD` blank again (the normal
+local-dev state), the navbar shows neither button, unchanged from before
+this round. `npx tsc --noEmit`, `eslint`, and `next build` all clean; the
+new `/api/site-auth/logout` route shows up correctly in the build output.
