@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ContentQualityRefreshButton } from "./ContentQualityRefreshButton";
 
 const TABS = [
   { href: "/overview", label: "Overview" },
@@ -42,6 +43,8 @@ export function Navbar() {
           })}
         </div>
       </div>
+
+      <ContentQualityRefreshButton />
     </nav>
   );
 }

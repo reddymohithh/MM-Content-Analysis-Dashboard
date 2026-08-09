@@ -2,6 +2,7 @@ import "server-only";
 import { desc, eq } from "drizzle-orm";
 import type { Edition, PublicationSnapshot } from "@/lib/types";
 import type { HookType } from "@/lib/scoring/subject-line";
+import type { ContentQualityCategoryResult, ContentQualityResult } from "@/lib/scoring/content-quality";
 import {
   SYNTHETIC_EDITIONS,
   SYNTHETIC_PUBLICATION,
@@ -211,6 +212,38 @@ function mapDbEditionToEdition(row: DbEditionRow): Edition {
       computed: row.avgSentenceLength != null,
     },
     dataSource: row.dataSource as "beehiiv_live" | "synthetic_demo",
+  };
+}
+
+export interface StoredContentQualityScore extends ContentQualityResult {
+  provider: string;
+  model: string;
+  scoredAt: Date;
+}
+
+/** Real-DB-only — synthetic demo data never has an LLM-scored content
+ * quality result, since that pipeline only ever runs against real Beehiiv
+ * content. */
+export async function getContentQualityScore(
+  editionId: string,
+): Promise<StoredContentQualityScore | null> {
+  if (!USE_DB) return null;
+
+  const { db } = await import("@/lib/db");
+  const { contentQualityScores } = await import("@/lib/db/schema");
+
+  const row = await db.query.contentQualityScores.findFirst({
+    where: eq(contentQualityScores.editionId, editionId),
+  });
+  if (!row) return null;
+
+  return {
+    total: row.total,
+    categories: row.categories as ContentQualityCategoryResult[],
+    narrative: row.narrative,
+    provider: row.provider,
+    model: row.model,
+    scoredAt: new Date(row.scoredAt),
   };
 }
 

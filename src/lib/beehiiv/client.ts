@@ -126,6 +126,11 @@ export interface BeehiivPost {
   /** Which channel(s) this post actually went out on. */
   platform?: "both" | "web" | "email";
   stats?: BeehiivPostStats;
+  /** Present when fetched with expand=free_web_content or free_email_content. */
+  content?: {
+    free?: { web?: string; email?: string };
+    premium?: { web?: string; email?: string };
+  };
 }
 
 export interface BeehiivEngagementPoint {

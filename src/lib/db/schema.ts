@@ -5,6 +5,7 @@ import {
   doublePrecision,
   boolean,
   timestamp,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -55,6 +56,11 @@ export const editions = pgTable("editions", {
   hasNumber: boolean("has_number").notNull().default(false),
   charLength: integer("char_length").notNull(),
 
+  // Plain-text extracted from Beehiiv's free_web_content HTML, used as the
+  // source text for LLM-based content-quality scoring. Null until a refresh
+  // has pulled it (see scripts fetch / the navbar refresh trigger).
+  content: text("content"),
+
   dataSource: text("data_source").notNull(), // 'beehiiv_live' | 'synthetic_demo'
   syncedAt: timestamp("synced_at", { withTimezone: true })
     .notNull()
@@ -69,6 +75,40 @@ export const editionsRelations = relations(editions, ({ one, many }) => ({
   topLinks: many(topLinks),
   promotedLinks: many(promotedLinks),
   comments: many(comments),
+  contentQualityScore: one(contentQualityScores, {
+    fields: [editions.id],
+    references: [contentQualityScores.editionId],
+  }),
+}));
+
+/**
+ * Editorial content-quality score from an LLM pass against the global
+ * newsletter content-analysis checklist (12 weighted categories, 0-5 each,
+ * N/A excluded and its weight redistributed proportionally) — deliberately
+ * independent of the engagement-metric-based score in quality-score.ts,
+ * since open rate/CTR/polls/unsub are explicitly *not* valid content-quality
+ * signals per that checklist. One row per edition, overwritten on re-score.
+ */
+export const contentQualityScores = pgTable("content_quality_scores", {
+  editionId: text("edition_id")
+    .primaryKey()
+    .references(() => editions.id, { onDelete: "cascade" }),
+  provider: text("provider").notNull(), // e.g. 'openai'
+  model: text("model").notNull(), // e.g. 'gpt-5.6-luna'
+  total: doublePrecision("total").notNull(), // 0-100, weight-redistributed
+  /** CategoryResult[] — see src/lib/scoring/content-quality.ts */
+  categories: jsonb("categories").notNull(),
+  narrative: text("narrative").notNull(),
+  scoredAt: timestamp("scored_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const contentQualityScoresRelations = relations(contentQualityScores, ({ one }) => ({
+  edition: one(editions, {
+    fields: [contentQualityScores.editionId],
+    references: [editions.id],
+  }),
 }));
 
 /**

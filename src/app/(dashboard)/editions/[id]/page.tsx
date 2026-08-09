@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getAllEditions, getEditionById, trailingAverages, canFlag } from "@/lib/data/editions";
+import {
+  getAllEditions,
+  getEditionById,
+  getContentQualityScore,
+  trailingAverages,
+  canFlag,
+} from "@/lib/data/editions";
 import { computeQualityScore } from "@/lib/scoring/quality-score";
 import { generateEditionTips, type Audience } from "@/lib/scoring/insights";
 import { usDate } from "@/lib/format";
@@ -8,6 +14,7 @@ import { StatCard, GradientStatCard, Card, Eyebrow, EmptyState } from "@/compone
 import { PollChart } from "@/components/dashboard/PollChart";
 import { QualityDonuts } from "@/components/dashboard/QualityDonuts";
 import { AudienceLensButtons } from "@/components/dashboard/AudienceLensButtons";
+import { ContentQualityPanel } from "@/components/dashboard/ContentQualityPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +30,11 @@ export default async function EditionDetailPage({
   const audience: Audience =
     audienceParam === "batch1" || audienceParam === "batch2" ? audienceParam : "blended";
 
-  const [edition, allEditions] = await Promise.all([getEditionById(id), getAllEditions()]);
+  const [edition, allEditions, contentQuality] = await Promise.all([
+    getEditionById(id),
+    getAllEditions(),
+    getContentQualityScore(id),
+  ]);
   if (!edition) notFound();
 
   const { avgCtr, avgUnsub } = trailingAverages(allEditions);
@@ -85,7 +96,7 @@ export default async function EditionDetailPage({
           <StatCard label="Open rate" value={`${edition.openRate}%`} />
           <StatCard label="CTR, overall" value={`${edition.ctrOverall}%`} />
           <StatCard label="Unsub rate" value={`${edition.unsubRate}%`} />
-          <GradientStatCard label="Content quality" value={`${quality.total}%`} />
+          <GradientStatCard label="Engagement score" value={`${quality.total}%`} />
         </div>
 
         <div className="rounded-xl border border-border bg-card p-4">
@@ -96,11 +107,24 @@ export default async function EditionDetailPage({
       <Card className="mb-4">
         <div className="mb-2 flex items-center justify-between gap-3">
           <div className="font-mono text-[11px] uppercase tracking-wide text-heading-soft">
-            Why this edition scored {quality.total}% content quality
+            Why this edition scored {quality.total}% engagement
           </div>
           <AudienceLensButtons />
         </div>
         <QualityDonuts result={quality} />
+      </Card>
+
+      <Card className="mb-4">
+        <div className="mb-1 font-mono text-[11px] uppercase tracking-wide text-heading-soft">
+          Content quality (editorial)
+          {contentQuality && <span className="ml-2 text-heading-soft">— {contentQuality.total}%</span>}
+        </div>
+        <p className="mb-3 text-[11.5px] text-text-muted">
+          Scored by an LLM against a 12-category editorial checklist — independent of open
+          rate, CTR, polls, or unsubscribes, which aren&apos;t valid content-quality signals
+          on their own.
+        </p>
+        <ContentQualityPanel result={contentQuality} />
       </Card>
 
       {flaggable && (

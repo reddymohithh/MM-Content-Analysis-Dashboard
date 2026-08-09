@@ -1298,3 +1298,114 @@ both the quality narrative/why-text and the Tips section changed together,
 confirming the fix worked correctly.
 
 Ran a full production build and closed the stale tab before committing.
+
+## Round 24: editorial content-quality scoring (new feature)
+
+The user shared a real, detailed editorial rubric they'd been planning
+separately: a "Global Newsletter Content Analysis Checklist" — 12 weighted
+categories (Audience Relevance, Topic Selection, Editorial Value-Add,
+Originality, Depth, Accuracy, Actionability, Readability, Narrative
+Engagement, Curation Coherence, Voice/Brand Fit, Memorability), each scored
+0-5, with an explicit rule that open rate/CTR/polls/unsub are *not* valid
+content-quality signals. They asked how to take it forward.
+
+**The core tension, stated plainly before building anything:** the existing
+`computeQualityScore` engagement-metric score is built from exactly the
+signals this new checklist says not to use. Recommended treating it as a
+genuinely separate, second score rather than trying to reconcile them —
+this checklist requires an LLM (or human) actually reading the edition's
+content, which is real text we didn't even have in the database yet.
+Recommendation (renaming the existing score, real content fetching, a
+provider-agnostic LLM layer, a stored/cached score rather than computed
+live, and a UI section with graphs) was laid out and the user confirmed the
+direction, picking GPT-5.6 Luna as the model but explicitly asking for
+architecture that can swap to *any* model later, not just Luna or Claude —
+and asked for a manual navbar trigger button rather than a CLI script or
+auto-run-on-sync, since LLM calls cost money per edition.
+
+**What got built, in order:**
+
+1. **Schema** (`src/lib/db/schema.ts`): added a `content` text column to
+   `editions` (plain-text extracted edition body, null until fetched) and a
+   new `content_quality_scores` table (one row per edition: provider, model,
+   total, a `categories` jsonb array, narrative, `scoredAt`) with its own
+   relation. Migration generated and pushed to the `local-real` branch.
+
+2. **The rubric itself**, ported verbatim into
+   `src/lib/scoring/content-quality.ts`: all 12 categories with their exact
+   weights (sum to exactly 1.0, checked by hand: 14+14+14+9+9+9+9+5+5+5+4+3),
+   core questions, and full criteria lists, used both to build the LLM
+   prompt and to define the JSON schema for structured output.
+   `computeContentQualityTotal()` deliberately does the N/A-redistribution
+   math in our own code rather than trusting the LLM's arithmetic: it
+   excludes null-scored categories from the denominator and redistributes
+   their weight proportionally across the rest, exactly as the checklist's
+   "Important Scoring Rule" section specifies.
+
+3. **Provider-agnostic LLM layer** (`src/lib/llm/`): a small `LlmProvider`
+   interface (`completeStructured<T>()`) that any adapter implements;
+   `providers/openai.ts` is the first (and only, for now) implementation,
+   using Chat Completions with `response_format: json_schema` (confirmed via
+   OpenAI's docs that gpt-5.6-luna supports structured outputs before
+   building against it). `getConfiguredLlmProvider()`/`getConfiguredLlmModel()`
+   read `CONTENT_QUALITY_LLM_PROVIDER`/`CONTENT_QUALITY_LLM_MODEL` env vars
+   (defaulting to openai/gpt-5.6-luna) — swapping models is an env-var
+   change; swapping to a wholly new provider is "add one file implementing
+   the interface, one line in the switch statement," not a rewrite of the
+   scoring pipeline. This directly answers "flexibility to change to any
+   model later, not just Luna or Claude."
+
+4. **Real content fetching.** Discovered (via a live API call, not
+   assumption) that Beehiiv's `expand=free_web_content` returns a full raw
+   HTML document (fonts, inline `<style>` blocks, layout markup) under
+   `data.content.free.web`, not plain text — feeding that directly to an
+   LLM would waste tokens on CSS boilerplate and dilute the actual copy.
+   Added `html-to-text` and `src/lib/scoring/extract-content.ts` to strip it
+   to clean plain text before it ever reaches the model.
+
+5. **The refresh pipeline**
+   (`src/app/api/content-quality/refresh/route.ts`, `POST`): finds every
+   real (`beehiiv_live`) edition without a `content_quality_scores` row,
+   fetches and caches its content if missing, scores it, upserts the
+   result. Explicit, clear error responses (not silent failures) when
+   `DATABASE_URL`/`BEEHIIV_API_KEY`/`OPENAI_API_KEY`/`BEEHIIV_PUBLICATION_ID`
+   aren't set — all local-only secrets by design, so this route is a
+   documented no-op on the public deployment rather than an accident.
+
+6. **UI**: `ContentQualityRefreshButton.tsx` in the navbar (loading state,
+   inline result/error message, `router.refresh()` on success so any open
+   edition page picks up new scores without a manual reload) and
+   `ContentQualityPanel.tsx` on the edition detail page — an overall score,
+   the narrative, and all 12 categories as labeled progress bars (color-
+   coded by score tier, weight shown per category, N/A categories rendered
+   distinctly) plus each category's own justification text. A clean empty
+   state points back at the navbar button when nothing's been scored yet.
+
+7. **Resolved a real naming collision** rather than leaving two things both
+   labeled "Content quality" on the same page: renamed the existing
+   engagement-metric score's stat tile and section heading to "Engagement
+   score" throughout the edition detail page, reserving "Content quality
+   (editorial)" for the new LLM-scored section, with an explicit note in the
+   UI that it's independent of open rate/CTR/polls/unsubscribes.
+
+**Not yet runnable — by design, not oversight.** No `OPENAI_API_KEY` has
+been provided yet. Verified the whole pipeline compiles, migrates, and
+renders correctly regardless: the new section shows its empty state
+correctly on a real synced edition, and clicking "Analyze content" in the
+navbar returns the exact expected error ("OPENAI_API_KEY is not set — can't
+run content-quality scoring") rather than crashing — confirming the
+env-var guard rails work before ever spending real money on a call. Ran a
+full production build and typecheck/lint before committing.
+
+**Found and fixed a real, longstanding bug while staging this commit:**
+`.env.example` had never actually been committed to the repo, ever — the
+`.gitignore`'s blanket `.env*` pattern was silently excluding it too,
+despite the file's own header comment saying it's "the only env-related
+file that belongs in the repo," and despite the README and multiple earlier
+BUILD_LOG entries describing it as already there. Caught it because `git
+status` after staging today's new files didn't list `.env.example` as
+modified even though it clearly had new content in it. Fixed with a `!
+.env.example` negation line in `.gitignore`, verified with `git add` that it
+now actually stages, and confirmed its contents hold no real secrets (every
+value blank except the already-public publication ID and non-sensitive
+default config) before letting it into a public repo for the first time.
