@@ -1200,3 +1200,11 @@ tries, it's worth stopping to ask for an exact number (or the user's actual
 window width) rather than continuing to iterate blind — this thread went
 six rounds before reverting to the pre-existing state turned out to be the
 right call.
+
+## Round 21: Retention header removal
+
+Same header-removal pattern applied to every other page this session,
+just reaching Retention last: removed the "Retention / Unsubscribe and
+spam trend..." title and caption block. Verified via `get_page_text` that
+the page now goes straight from the navbar into the stat cards, and ran a
+full production build before committing.

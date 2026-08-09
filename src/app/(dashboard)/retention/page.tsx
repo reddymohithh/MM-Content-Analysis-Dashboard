@@ -1,6 +1,6 @@
 import { getAllEditions, getPublicationSnapshot, trailingAverages } from "@/lib/data/editions";
 import { round2 } from "@/lib/format";
-import { PageTitle, StatCard, Card } from "@/components/dashboard/ui";
+import { StatCard, Card } from "@/components/dashboard/ui";
 import { RetentionExplorer, type RetentionRow } from "@/components/dashboard/RetentionExplorer";
 
 export const dynamic = "force-dynamic";
@@ -13,11 +13,6 @@ export default async function RetentionPage() {
 
   return (
     <div>
-      <PageTitle
-        title="Retention"
-        caption="Unsubscribe and spam trend across the trailing window, flagged against the current net-subscriber movement."
-      />
-
       <div className="mb-4 grid grid-cols-3 gap-3.5">
         <StatCard
           label="Unsub rate, avg"
