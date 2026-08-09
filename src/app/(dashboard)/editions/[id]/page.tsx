@@ -51,7 +51,7 @@ export default async function EditionDetailPage({
   }
 
   return (
-    <div>
+    <div className="mx-auto max-w-[1120px]">
       <Link href="/editions" className="mb-3 inline-block text-[12.5px] text-text-muted no-underline">
         ← Back to editions
       </Link>

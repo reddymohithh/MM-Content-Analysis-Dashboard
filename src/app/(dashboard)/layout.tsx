@@ -11,9 +11,7 @@ export default function DashboardLayout({
       <Suspense fallback={<div className="h-[57px] flex-shrink-0 bg-ink" />}>
         <Navbar />
       </Suspense>
-      <div className="flex-1 overflow-y-auto px-8 py-5">
-        <div className="mx-auto w-full max-w-[1300px]">{children}</div>
-      </div>
+      <div className="flex-1 overflow-y-auto px-8 py-5">{children}</div>
     </div>
   );
 }

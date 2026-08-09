@@ -1178,3 +1178,25 @@ table-level fix (e.g. not stretching the Subject column to fill 100% of a
 wide container) is available as a follow-up if the gap still bothers them
 at their actual screen width, rather than silently changing more than what
 was asked. Ran a full production build before committing.
+
+## Round 20: revert the whole width thread
+
+After six rounds of adjustment (14-19) chasing an exact width the user
+seemingly could never quite confirm from annotated screenshots alone, the
+answer was simpler: undo all of it. Rather than pick another guessed value,
+restored both files to their exact state immediately before Round 14 via
+`git checkout 01d0b3a -- "src/app/(dashboard)/layout.tsx"
+"src/app/(dashboard)/editions/[id]/page.tsx"` — `01d0b3a` being the last
+commit before "Cap content width app-wide" — putting the shared layout back
+to no max-width wrapper at all, and the edition detail page back to owning
+its own `mx-auto max-w-[1120px]` independently, exactly as it was before
+this entire thread started. Verified via live DOM inspection that the
+wrapper div's class is empty (no `max-w-*`) and content width simply equals
+viewport width again. Ran a full production build before committing.
+
+Takeaway for next time: when width/spacing feedback comes only as annotated
+screenshots with no confirmed pixel value landing right after several
+tries, it's worth stopping to ask for an exact number (or the user's actual
+window width) rather than continuing to iterate blind — this thread went
+six rounds before reverting to the pre-existing state turned out to be the
+right call.
