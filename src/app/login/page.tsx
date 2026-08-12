@@ -24,10 +24,6 @@ export default async function LoginPage({
           <div className="mb-4 font-serif text-[19px] font-semibold">
             Marketing Monk<span className="text-orange">.</span>
           </div>
-          <p className="mb-4 text-[13px] text-text-muted">
-            This dashboard is a private demo. Enter a username and the
-            password to continue.
-          </p>
           <form method="POST" action="/api/site-auth" className="space-y-3">
             <input type="hidden" name="next" value={next ?? "/overview"} />
             <input
