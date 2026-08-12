@@ -1617,3 +1617,30 @@ dev's normal gate-off state (blank `SITE_PASSWORD`, no DB override) was
 completely unaffected. `npx tsc --noEmit`, `eslint`, and `next build` all
 clean; `/change-password` and `/api/site-auth/change-password` both show
 up correctly in the build output.
+
+## Round 28: navbar visible-but-inert on the login screen
+
+`/login` previously rendered as a bare centered card with no navbar at
+all, which read as a different, broken-looking app rather than the same
+dashboard mid-gate. Added the navbar there too, but every control in it is
+inert: `Navbar` takes a new `disabled` prop that swaps the logo and tab
+links for plain, dimmed `<span>`s (no `href`, so no navigation is even
+possible) and renders Fetch/Analyze content as static `disabled` buttons
+instead of live `NavTriggerButton`s — no fetch calls, no state. The
+account menu is skipped entirely on `/login`, since there's no session to
+manage yet. `authButton` became optional on `Navbar` (defaults to `null`)
+so the disabled call site doesn't need to fake one.
+
+`/login/page.tsx` now wraps its centered card in the same flex-column +
+navbar shell the dashboard layout uses, instead of one `min-h-screen`
+flex-center div — the actual password form and its error state are
+untouched.
+
+**Verified in the browser**: loaded `/login`, confirmed via
+`read_page`(interactive-only filter) that the tab links and logo no longer
+appear as interactive elements at all (rendered as text, not
+links/buttons) — only the password field, "Enter", and the two disabled
+Fetch/Analyze buttons show up. Clicked "Editions" directly: `location.href`
+stayed on `/login`. Clicked "Fetch": confirmed via
+`read_network_requests` that no request was ever sent. `npx tsc --noEmit`,
+`eslint`, and `next build` all clean.
