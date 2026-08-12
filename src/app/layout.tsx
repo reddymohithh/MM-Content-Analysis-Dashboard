@@ -21,7 +21,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Marketing Monk — Content Dashboard",
+  title: "Marketing Monk: Content Dashboard",
   description:
     "Content analysis dashboard for the Marketing Monk Beehiiv newsletter.",
 };

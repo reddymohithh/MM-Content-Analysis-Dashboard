@@ -106,7 +106,7 @@ export default async function OverviewPage() {
 
       <div className="grid grid-cols-2 gap-3.5">
         <Card>
-          <Eyebrow>Batch 1 — practitioners</Eyebrow>
+          <Eyebrow>Batch 1: practitioners</Eyebrow>
           <p className="mb-2 text-[13px] leading-relaxed">{batch1.narrative}</p>
           <div className="mb-1 font-mono text-[10px] uppercase tracking-wide text-text-muted">
             Action steps
@@ -118,7 +118,7 @@ export default async function OverviewPage() {
           </ul>
         </Card>
         <Card>
-          <Eyebrow>Batch 2 — leadership</Eyebrow>
+          <Eyebrow>Batch 2: leadership</Eyebrow>
           <p className="mb-2 text-[13px] leading-relaxed">{batch2.narrative}</p>
           <div className="mb-1 font-mono text-[10px] uppercase tracking-wide text-text-muted">
             Action steps

@@ -1686,3 +1686,63 @@ no dropdown, signed out and landed back on `/login`, confirmed
 `POST /api/site-auth/change-password` now 404s. `npx tsc --noEmit`,
 `eslint`, and `next build` all clean — build output no longer lists
 `/change-password` or `/api/site-auth/change-password` as routes.
+
+## Round 30: drop the explanatory line on the login screen
+
+Removed "This dashboard is a private demo. Enter a username and the
+password to continue." from `/login` per direct request — the form fields
+(Username, Password) speak for themselves. Also answered a follow-up
+question about why the Log in/Log out button wasn't showing locally: it's
+because `SITE_PASSWORD` is blank in `.env.local` by design (gate off for
+local dev), not a bug — set a temporary local password to demonstrate the
+button live, then confirmed with the user this was a local-only change
+they wanted to keep for testing.
+
+## Round 31: strip em dashes and en dashes from every user-facing string
+
+Direct instruction, with two examples flagged from the edition detail
+page's content-quality section. Rather than patch just those two lines,
+searched every `.ts`/`.tsx` file under `src/` line-by-line for `—`/`–` and
+triaged each hit: rendered UI strings got fixed, code comments (which
+never reach the browser) were left alone. Fixed, all rendered text:
+
+- `layout.tsx` page `<title>` (shown in the browser tab)
+- Both example lines from the request, in `editions/[id]/page.tsx`, plus
+  the `— {total}%` next to "Content quality (editorial)" (swapped for the
+  `·` separator already used elsewhere on that same page for consistency)
+- Every `NextResponse.json({ error: "... — ..." })` message across the
+  Fetch/Analyze content API routes, since those render directly in the
+  navbar's result popover
+- "Batch 1 — practitioners" / "Batch 2 — leadership" headings on Overview
+  (now colons)
+- "Reader feedback — N responses" in `PollChart.tsx` (now a colon)
+- The generic "Request failed — check the server logs." fallback in
+  `NavTriggerButton.tsx`
+- All four audience-lens "why" narrative strings in `quality-score.ts`
+  (the batch1/batch2 branches — the blended default already had none)
+- The bare `–` used as a Min/Max and date-range separator in
+  `EditionsExplorer.tsx` (×2) and `SubjectLineLabExplorer.tsx` (×1),
+  replaced with the word "to"
+
+Also addressed the one place dashes could still slip in through a side
+door: the content-quality LLM system prompt
+(`buildContentQualitySystemPrompt` in `content-quality.ts`) generates the
+`narrative` and per-category `justification` text that renders in
+`ContentQualityPanel` — free text from the model, not a hardcoded string.
+Added an explicit style instruction to the prompt ("do not use em dashes
+or en dashes... use periods, commas, or 'and'/'but' instead") so future
+LLM-scored editions don't reintroduce them. Checked
+`src/lib/synthetic-data.ts` too, since that's what the public Vercel
+deployment actually renders — already clean.
+
+Left dashes in code comments untouched (they're not "on the site" — never
+sent to the browser), and in `content-quality.ts`'s prompt body itself
+outside the new style instruction (it's an instruction sent to the model,
+not rendered).
+
+**Verified in the browser**, not just by editing: loaded the edition
+detail page and confirmed via `get_page_text` that both flagged lines,
+the Batch 1/Batch 2 audience-lens narratives (blended, batch1, and
+batch2), and the Editions-page range filters all render exactly as
+rewritten, no dashes. `npx tsc --noEmit`, `eslint`, and `next build` all
+clean.

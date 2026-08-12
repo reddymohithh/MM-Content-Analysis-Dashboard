@@ -293,7 +293,9 @@ Evaluate ONLY the editorial content quality itself. Do not consider or infer any
 
 ${categoryBlocks}
 
-For each category, give a 0-5 score (or null for N/A) and a one-to-two sentence justification grounded in the actual text. Then write one short overall narrative paragraph (2-3 sentences) summarizing the edition's editorial strengths and weaknesses.`;
+For each category, give a 0-5 score (or null for N/A) and a one-to-two sentence justification grounded in the actual text. Then write one short overall narrative paragraph (2-3 sentences) summarizing the edition's editorial strengths and weaknesses.
+
+Style: do not use em dashes or en dashes anywhere in your justifications or narrative. Use periods, commas, or "and"/"but" instead.`;
 }
 
 export const CONTENT_QUALITY_JSON_SCHEMA = {

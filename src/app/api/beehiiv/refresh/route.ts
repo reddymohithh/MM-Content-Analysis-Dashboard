@@ -14,13 +14,13 @@ export const maxDuration = 300;
 export async function POST() {
   if (!process.env.DATABASE_URL) {
     return NextResponse.json(
-      { error: "DATABASE_URL is not set — nothing to sync into." },
+      { error: "DATABASE_URL is not set. Nothing to sync into." },
       { status: 400 },
     );
   }
   if (!process.env.BEEHIIV_API_KEY) {
     return NextResponse.json(
-      { error: "BEEHIIV_API_KEY is not set — can't fetch from Beehiiv." },
+      { error: "BEEHIIV_API_KEY is not set. Can't fetch from Beehiiv." },
       { status: 400 },
     );
   }

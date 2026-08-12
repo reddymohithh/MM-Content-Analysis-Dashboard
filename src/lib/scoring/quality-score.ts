@@ -184,12 +184,12 @@ function whyFor(key: QualityScoreComponent["key"], score: number, audience: Audi
     switch (key) {
       case "sat":
         return score >= 65
-          ? "Practitioners rated this useful — the tactical takeaway landed."
+          ? "Practitioners rated this useful. The tactical takeaway landed."
           : "Practitioners flagged this as less immediately useful than usual.";
       case "eng":
         return score >= 70
           ? "Practitioners clicked through for the how-to at or above the recent normal."
-          : "Practitioners clicked through less than usual — may be missing a concrete, same-day action.";
+          : "Practitioners clicked through less than usual, may be missing a concrete, same-day action.";
       case "ret":
         return score >= 70
           ? "This practitioner-facing send isn't driving unsubscribes, a good sign."
@@ -203,11 +203,11 @@ function whyFor(key: QualityScoreComponent["key"], score: number, audience: Audi
       case "sat":
         return score >= 65
           ? "Leadership readers responded well to the strategic framing."
-          : "Leadership readers rated this lower than usual — may be reading as too tactical.";
+          : "Leadership readers rated this lower than usual, may be reading as too tactical.";
       case "eng":
         return score >= 70
           ? "Leadership readers engaged with the category-level angle at or above the recent normal."
-          : "Leadership engagement lagged — may need a sharper budget or category-level hook.";
+          : "Leadership engagement lagged, may need a sharper budget or category-level hook.";
       case "ret":
         return score >= 70
           ? "This leadership-facing send isn't driving unsubscribes, a good sign."

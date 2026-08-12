@@ -23,19 +23,19 @@ export const maxDuration = 300;
 export async function POST() {
   if (!process.env.DATABASE_URL) {
     return NextResponse.json(
-      { error: "DATABASE_URL is not set — nothing to score against." },
+      { error: "DATABASE_URL is not set. Nothing to score against." },
       { status: 400 },
     );
   }
   if (!process.env.BEEHIIV_API_KEY) {
     return NextResponse.json(
-      { error: "BEEHIIV_API_KEY is not set — can't fetch edition content." },
+      { error: "BEEHIIV_API_KEY is not set. Can't fetch edition content." },
       { status: 400 },
     );
   }
   if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json(
-      { error: "OPENAI_API_KEY is not set — can't run content-quality scoring." },
+      { error: "OPENAI_API_KEY is not set. Can't run content-quality scoring." },
       { status: 400 },
     );
   }

@@ -56,7 +56,7 @@ export default async function EditionDetailPage({
   const notices: string[] = [];
   if (!quality.voiceComputed) {
     notices.push(
-      "Writing and voice compliance scoring is a placeholder — it assumes clean copy until real text analysis is wired up.",
+      "Writing and voice compliance scoring is a placeholder. It assumes clean copy until real text analysis is wired up.",
     );
   }
   if (edition.poll && !edition.poll.exact && edition.poll.note) {
@@ -117,10 +117,10 @@ export default async function EditionDetailPage({
       <Card className="mb-4">
         <div className="mb-1 font-mono text-[11px] uppercase tracking-wide text-heading-soft">
           Content quality (editorial)
-          {contentQuality && <span className="ml-2 text-heading-soft">— {contentQuality.total}%</span>}
+          {contentQuality && <span className="ml-2 text-heading-soft">· {contentQuality.total}%</span>}
         </div>
         <p className="mb-3 text-[11.5px] text-text-muted">
-          Scored by an LLM against a 12-category editorial checklist — independent of open
+          Scored by an LLM against a 12-category editorial checklist. Independent of open
           rate, CTR, polls, or unsubscribes, which aren&apos;t valid content-quality signals
           on their own.
         </p>

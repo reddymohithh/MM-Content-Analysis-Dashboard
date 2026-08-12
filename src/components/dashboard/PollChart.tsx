@@ -66,7 +66,7 @@ export function PollChart({ poll }: { poll: PollTally | null }) {
   return (
     <div className="flex flex-col">
       <div className="mb-1 font-mono text-[10.5px] uppercase tracking-wide text-text-muted">
-        Reader feedback — {poll.total} responses
+        Reader feedback: {poll.total} responses
       </div>
       <div className="relative">
         <svg width="100%" height={160} viewBox={`0 0 ${VIEW_W} 160`} style={{ overflow: "visible" }}>

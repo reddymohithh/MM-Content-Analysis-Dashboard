@@ -55,7 +55,7 @@ export function NavTriggerButton({
       router.refresh();
     } catch {
       setStatus("error");
-      showMessage("Request failed — check the server logs.");
+      showMessage("Request failed. Check the server logs.");
     }
   }
 

@@ -50,7 +50,7 @@ function RangeField({
           onChange={(e) => onMinChange(e.target.value)}
           className={numberCls}
         />
-        <span className="text-text-faint">–</span>
+        <span className="text-text-faint">to</span>
         <input
           type="number"
           inputMode="decimal"
@@ -128,7 +128,7 @@ export function EditionsExplorer({ editions }: { editions: EditionRow[] }) {
                 onChange={(e) => setDateFrom(e.target.value)}
                 className={dateCls}
               />
-              <span className="text-text-faint">–</span>
+              <span className="text-text-faint">to</span>
               <input
                 type="date"
                 value={dateTo}

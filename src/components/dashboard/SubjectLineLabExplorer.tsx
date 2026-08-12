@@ -48,7 +48,7 @@ function RangeField({
           onChange={(e) => onMinChange(e.target.value)}
           className={numberCls}
         />
-        <span className="text-text-faint">–</span>
+        <span className="text-text-faint">to</span>
         <input
           type="number"
           inputMode="decimal"
