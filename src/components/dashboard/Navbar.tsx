@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NavTriggerButton } from "./NavTriggerButton";
-import { AuthMenu } from "./AuthMenu";
 
 const TABS = [
   { href: "/overview", label: "Overview" },
@@ -18,9 +17,9 @@ const inertTriggerButtonClasses =
 /**
  * `disabled` renders the same navbar on /login — so the app doesn't look
  * broken behind the login card — but every control in it is inert: no
- * navigation, no data fetching, no auth menu (there's no session to manage
- * yet). Tabs/logo become plain `<span>`s and the trigger buttons render as
- * static disabled buttons instead of live `NavTriggerButton`s.
+ * navigation, no data fetching, no log in/out button (there's no session
+ * to manage yet). Tabs/logo become plain `<span>`s and the trigger buttons
+ * render as static disabled buttons instead of live `NavTriggerButton`s.
  */
 export function Navbar({
   authButton,
@@ -119,7 +118,16 @@ export function Navbar({
                   : "All editions already scored."
               }
             />
-            {authButton === "logout" && <AuthMenu />}
+            {authButton === "logout" && (
+              <form action="/api/site-auth/logout" method="POST">
+                <button
+                  type="submit"
+                  className="flex flex-shrink-0 items-center whitespace-nowrap rounded-lg border border-text-faint/40 px-3 py-1.5 text-[12px] font-medium text-text-faint transition-colors hover:text-cream"
+                >
+                  Log out
+                </button>
+              </form>
+            )}
             {authButton === "login" && (
               <Link
                 href="/login"

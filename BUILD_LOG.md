@@ -1644,3 +1644,45 @@ Fetch/Analyze buttons show up. Clicked "Editions" directly: `location.href`
 stayed on `/login`. Clicked "Fetch": confirmed via
 `read_network_requests` that no request was ever sent. `npx tsc --noEmit`,
 `eslint`, and `next build` all clean.
+
+## Round 29: revert Round 27 — password back to a code-only constant, plain Log in/out button, username field on login
+
+Explicit instruction: remove "Change password" entirely — "I will manually
+change it in the code (so that only I can change the password, nobody
+else in the team can)." That's the opposite goal from Round 27's DB-backed
+mutable password (which let anyone who *knew* the current password rotate
+it for the whole team), so this round undoes that architecture rather than
+patching around it:
+
+1. **`src/lib/site-auth.ts`** back to the pre-Round-27 version:
+   `verifySitePassword` compares straight against `SITE_PASSWORD`, no Neon
+   lookup, no in-memory cache, no `changeSitePassword`. `proxy.ts` and
+   `(dashboard)/layout.tsx` follow it back to their synchronous env-var
+   checks.
+2. **Deleted** `POST /api/site-auth/change-password`, the `/change-password`
+   page, and `AuthMenu.tsx` (the dropdown). Confirmed nothing else
+   referenced any of them before removing.
+3. **Dropped `site_auth_settings`** from the schema and pushed the drop
+   migration (`drizzle/0003_graceful_ken_ellis.sql`) to the local
+   `local-real` Neon branch — it was never pushed to production, so
+   nothing to clean up there.
+4. **Navbar**: the dropdown is gone. A single button now sits right after
+   "Analyze content" — "Log out" (a plain cookie-clearing form submit,
+   same as Round 26) when signed in, "Log in" (a link to `/login`) when
+   not. Exactly the toggle-by-state behavior asked for, minus the menu.
+5. **Login form gets a username field.** Per the ask — "it must ask for a
+   user name and password (user name can be anything, but password is
+   constant)" — `/login` now has a Username input alongside Password.
+   `POST /api/site-auth` requires it non-empty (distinct error: "Enter a
+   username.") but never validates or stores its value; the password check
+   is the only thing that gates access, unchanged from before. Documented
+   this plainly in `site-auth.ts`'s header comment so it isn't mistaken
+   for real per-user auth later.
+
+**Verified live**: temporarily re-set a test `SITE_PASSWORD` (restored
+after), logged in with an arbitrary username and the correct password,
+confirmed the navbar shows "Log out" directly after "Analyze content" with
+no dropdown, signed out and landed back on `/login`, confirmed
+`POST /api/site-auth/change-password` now 404s. `npx tsc --noEmit`,
+`eslint`, and `next build` all clean — build output no longer lists
+`/change-password` or `/api/site-auth/change-password` as routes.

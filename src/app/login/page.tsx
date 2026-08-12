@@ -1,12 +1,18 @@
 import { Suspense } from "react";
 import { Navbar } from "@/components/dashboard/Navbar";
 
+const ERROR_MESSAGES: Record<string, string> = {
+  username: "Enter a username.",
+  password: "That password isn't right.",
+};
+
 export default async function LoginPage({
   searchParams,
 }: {
   searchParams: Promise<{ next?: string; error?: string }>;
 }) {
   const { next, error } = await searchParams;
+  const errorMessage = error ? (ERROR_MESSAGES[error] ?? ERROR_MESSAGES.password) : null;
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-cream">
@@ -19,20 +25,27 @@ export default async function LoginPage({
             Marketing Monk<span className="text-orange">.</span>
           </div>
           <p className="mb-4 text-[13px] text-text-muted">
-            This dashboard is a private demo. Enter the password to continue.
+            This dashboard is a private demo. Enter a username and the
+            password to continue.
           </p>
           <form method="POST" action="/api/site-auth" className="space-y-3">
             <input type="hidden" name="next" value={next ?? "/overview"} />
             <input
+              type="text"
+              name="username"
+              autoFocus
+              autoComplete="username"
+              placeholder="Username"
+              className="w-full rounded-lg border border-border bg-card-soft px-3 py-2 text-[13px] outline-none focus:border-orange"
+            />
+            <input
               type="password"
               name="password"
-              autoFocus
+              autoComplete="current-password"
               placeholder="Password"
               className="w-full rounded-lg border border-border bg-card-soft px-3 py-2 text-[13px] outline-none focus:border-orange"
             />
-            {error && (
-              <p className="text-[12px] text-negative">That password isn&apos;t right.</p>
-            )}
+            {errorMessage && <p className="text-[12px] text-negative">{errorMessage}</p>}
             <button
               type="submit"
               className="w-full rounded-lg bg-orange px-3 py-2 text-[13px] font-semibold text-ink"

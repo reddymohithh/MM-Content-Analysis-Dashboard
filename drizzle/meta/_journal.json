@@ -22,6 +22,13 @@
       "when": 1786269182536,
       "tag": "0002_chunky_brood",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786548078456,
+      "tag": "0003_graceful_ken_ellis",
+      "breakpoints": true
     }
   ]
 }

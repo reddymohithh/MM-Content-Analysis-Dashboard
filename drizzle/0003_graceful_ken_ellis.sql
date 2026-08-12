@@ -1,0 +1,1 @@
+DROP TABLE "site_auth_settings" CASCADE;
