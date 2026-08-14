@@ -37,3 +37,19 @@ export async function verifySitePassword(candidate: string): Promise<boolean> {
   if (!expected) return true; // gate is off if no password is configured
   return candidate === expected;
 }
+
+/**
+ * Which auth button a navbar should show, shared by every top-level
+ * dashboard layout (content, ads, ...). If no SITE_PASSWORD is
+ * configured, the gate is off (see proxy.ts) and "logged in/out" isn't a
+ * meaningful concept — callers should show neither button.
+ */
+export async function getAuthButtonState(): Promise<"login" | "logout" | null> {
+  const password = process.env.SITE_PASSWORD;
+  if (!password) return null;
+  const { cookies } = await import("next/headers");
+  const cookieStore = await cookies();
+  const cookie = cookieStore.get(SITE_AUTH_COOKIE)?.value;
+  const expected = await computeSiteAuthToken(password);
+  return cookie === expected ? "logout" : "login";
+}

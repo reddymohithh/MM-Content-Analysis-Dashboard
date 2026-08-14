@@ -79,6 +79,9 @@ export function Navbar({
       <div className="flex flex-shrink-0 items-center gap-2">
         {disabled ? (
           <>
+            <span className="whitespace-nowrap rounded-lg px-3 py-1.5 text-[12px] font-medium text-text-faint/40">
+              Ads →
+            </span>
             <button type="button" disabled className={inertTriggerButtonClasses}>
               <span className="inline-block">↻</span>
               Fetch
@@ -90,6 +93,12 @@ export function Navbar({
           </>
         ) : (
           <>
+            <Link
+              href="/ads"
+              className="whitespace-nowrap rounded-lg px-3 py-1.5 text-[12px] font-medium text-text-faint no-underline transition-colors hover:text-cream"
+            >
+              Ads →
+            </Link>
             <NavTriggerButton
               idleLabel="Fetch"
               runningLabel="Fetching…"

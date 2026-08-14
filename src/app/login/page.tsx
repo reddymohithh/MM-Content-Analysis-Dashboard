@@ -25,7 +25,7 @@ export default async function LoginPage({
             Marketing Monk<span className="text-orange">.</span>
           </div>
           <form method="POST" action="/api/site-auth" className="space-y-3">
-            <input type="hidden" name="next" value={next ?? "/overview"} />
+            <input type="hidden" name="next" value={next ?? "/"} />
             <input
               type="text"
               name="username"

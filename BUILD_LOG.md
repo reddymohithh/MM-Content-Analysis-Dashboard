@@ -1936,3 +1936,67 @@ Fetch/Analyze content precedent, not yet explicitly confirmed) are all
 still open until the SparkLoop research pass happens — deliberately
 sequencing "understand all three data sources" before "design the schema
 that has to hold all three."
+
+## Round 34: SparkLoop v3 is gated, and the content/ads dashboard split
+
+**SparkLoop, resolved for now.** Added the real API key to `.env.local`
+and tested live rather than trusting the docs alone. Confirmed via
+`docs.sparkloop.app/llms-full.txt` that the endpoints matching what was
+described — Partner Program campaigns, referrals, and earnings groupable
+by `utm_campaign` — all live under API v3. A live call to
+`GET /v3/publications` returned `403 {"error":"The v3 API is not enabled
+for your account."}`. Checked what v2 (the version actually granted)
+exposes instead: only the `Upscribe` widget's own config for this
+publication — a two-sided recommendation marketplace with real `cpa` and
+payout fields, but not a queryable list of this publication's own paid
+acquisition campaigns. Conclusion: v2 doesn't answer the question being
+asked. Told the user to email `support@sparkloop.app` requesting v3
+access; SparkLoop stays deferred until that's granted, exactly the outcome
+flagged as a risk in Round 33, now confirmed rather than assumed.
+
+**Then: separating the content and ads dashboards.** Explicit instruction
+that the two must be independent — choosing "Content" opens everything
+already built, choosing "Ads" opens the new (still mostly unbuilt) area,
+and neither should disturb the other. Built the navigational skeleton for
+this, deliberately touching as little existing code as possible:
+
+1. **Extracted `getAuthButtonState()`** into `site-auth.ts` (previously a
+   private function duplicated inline in the dashboard layout) — both the
+   content and ads layouts now call the same one, avoiding a second
+   hand-copy of the cookie/token comparison logic. Everything else about
+   how the content dashboard works is untouched.
+2. **New, separate `AdsNavbar`** (`src/components/ads/AdsNavbar.tsx`) —
+   its own title ("Marketing Monk Ads"), its own future action buttons
+   (none yet — Fetch/Analyze content are content-dashboard-specific and
+   don't belong here), a "← Content" link back, and the same Log
+   in/out control. Not a variant of the existing `Navbar`; a separate
+   component, so nothing about the ads dashboard can accidentally change
+   content-dashboard navigation.
+3. **New `/ads` route** (`src/app/ads/layout.tsx` + `page.tsx`) — a real
+   path segment, not a route group, since the URL itself should say
+   `/ads`. The page is an honest empty state for now: explains what's
+   coming (the Meta ↔ Beehiiv comparison) and why SparkLoop isn't there
+   yet, rather than showing placeholder fake data.
+4. **Root `/` became a chooser** instead of an unconditional
+   `redirect("/overview")` — two cards, "Content Dashboard" and "Ads
+   Dashboard," so picking one is a real, visible choice rather than
+   always landing on content by default. `/login`'s bare fallback
+   redirect (when no `next` param is present) now points at `/` instead
+   of `/overview` to match — a visit to a specific page still returns you
+   there after login, this only changes the no-context default.
+5. Added small reciprocal cross-links — "Ads →" in the content navbar,
+   "← Content" in the ads navbar — so switching doesn't require going
+   back through the chooser every time. Both dashboards otherwise share
+   nothing but the auth gate and the generic `ui.tsx` presentational
+   primitives (`Card`, `Eyebrow`, `PageTitle`, `EmptyState` — not
+   business logic).
+
+**Verified in the browser, both directions**: logged in fresh, landed on
+the new chooser, opened Ads (own navbar, honest status card, "Log out"
+correctly shares the session), clicked back to Content and confirmed
+every existing tab, stat, and button still renders exactly as before —
+zero regressions in the part that was explicitly not supposed to move.
+`npx tsc --noEmit`, `eslint`, and `next build` all clean; `/` and `/ads`
+both show up correctly in the build output (`/` is now dynamic instead of
+statically prerendered, expected since it reads nothing but renders two
+links — no behavior risk from that alone).
