@@ -1746,3 +1746,102 @@ the Batch 1/Batch 2 audience-lens narratives (blended, batch1, and
 batch2), and the Editions-page range filters all render exactly as
 rewritten, no dashes. `npx tsc --noEmit`, `eslint`, and `next build` all
 clean.
+
+## Round 32: the first real push to GitHub and Vercel, and a schema-drift bug it uncovered
+
+Everything up to this point had been built and committed locally only, per
+the earlier "let's do everything locally, then push" instruction. This
+round is that push finally happening, plus fixing what broke the moment
+it went live.
+
+**Getting `git push` working at all.** First attempt failed with a 403 —
+the credential cached in this Mac's Keychain for `github.com` was stale.
+Walked through: `git credential-osxkeychain erase` to clear it, then
+generating a real GitHub Personal Access Token for the first time. Started
+by suggesting a classic token (fewer setup steps) but switched to
+recommending a fine-grained token instead once asked "why not
+fine-grained" — it's genuinely the better choice for a single personal
+repo (scoped to just `MM-Content-Analysis-Dashboard`, just the `Contents:
+Read and write` permission, instead of a classic token's blanket access to
+every repo on the account) and there was no real reason to default to the
+lower-security option other than fewer clicks. Walked through the
+fine-grained token screen live, including the part that trips people up
+(permissions default to none until you explicitly click "Add permissions"
+and grant Contents write access). Push succeeded: 30 local commits landed
+on `main` in one go.
+
+**Vercel auto-deployed on push** — confirmed the project's GitHub
+integration is active (no Vercel CLI or manual `vercel deploy` needed;
+every push to `main` triggers a new Production deployment on its own).
+
+**Then the live site 500'd.** `/overview` on the deployed site returned
+"This page couldn't load. A server error occurred." Root cause, found by
+connecting directly to the production Neon branch and comparing its
+actual table/column list against `schema.ts`: production was missing the
+entire `content_quality_scores` table and the `editions.content` column
+from Round 24's content-quality-scoring feature. Every `drizzle-kit push`
+run this session (Round 24 through Round 29's table drop) had only ever
+been run against the local `local-real` branch's `DATABASE_URL` — nothing
+had ever been pushed to the branch the public deployment actually reads
+from. The moment a data-layer query touched the missing
+`content_quality_scores` relation, Postgres had nothing to query and
+Next.js surfaced it as a generic 500. Confirmed with the user before
+touching production, then ran `drizzle-kit push` against the production
+connection string (pulled from the reference comment already sitting in
+`.env.local`) — purely additive (`CREATE TABLE`, `ADD COLUMN`, no prompts
+about data loss), verified after via the same direct-connection schema
+check. Reloading `/overview` on the live site went from a 500 to a clean
+redirect to `/login`, confirming the fix.
+
+**Then: should the live site show real data at all?** User asked to add
+the real `BEEHIIV_API_KEY` to Vercel so the "Fetch" button would work on
+the public deployment. Flagged before doing it that this is a bigger
+decision than it looks: the production database was seeded with only
+synthetic demo data specifically so a site gated by a password shared with
+portfolio viewers never exposes real subscriber/performance numbers.
+Enabling live Fetch there means real data becomes visible to anyone with
+that password. Confirmed explicitly (twice — once up front, once again
+after the user separately asked "the data on GitHub is demo data, not real
+data, right?", which was a chance to make sure the GitHub-vs-live-site
+distinction was actually understood before proceeding) that showing real
+data live is what was wanted.
+
+Also caught a second problem before it caused visible damage: none of the
+edition-reading queries (`getAllEditions`, `getEditionById`) filter by
+`data_source`, so if real `beehiiv_live` editions were fetched into a
+database that still had the 16 seeded `synthetic_demo` ones, the site
+would show both mixed together in the same list forever — Round 25's sync
+logic only ever cleans up stale `beehiiv_live` rows, never touches
+`synthetic_demo` ones. Confirmed with the user, then deleted the 16
+synthetic editions and 1 synthetic publication snapshot from the
+production database (cascade-deleted their child rows via existing FK
+constraints) so the first real Fetch produces a clean all-real dataset
+instead of a mixed one.
+
+**Walked the user through the actual Vercel/Finder mechanics live**,
+since API keys can't be entered into third-party dashboards on someone
+else's behalf: finding `.env.local` in Finder (it's a dotfile, hidden by
+default, `⌘ Shift .` to reveal), correcting a wrong-folder mix-up
+("MM Content Analysis Dashboard" vs. the actual local folder "Content
+Dashboard MM" — a different, unrelated directory that happened to have a
+similar name), copying just the `BEEHIIV_API_KEY` value out of it, adding
+it in Vercel's Environment Variables screen (`BEEHIIV_PUBLICATION_ID` was
+already set from earlier in the project), and redeploying so the new env
+var actually takes effect (Vercel doesn't retroactively apply env var
+changes to an already-built deployment).
+
+**Last snag**: after redeploying, login with "demo1234" failed on the live
+site. That password only ever existed in local `.env.local` (set earlier
+this session purely to demo the Log in/Log out button locally) — the
+live site's `SITE_PASSWORD` is a separate value set directly in Vercel,
+from earlier in the project, and wasn't visible to either of us since
+Vercel masks "Sensitive" env vars. Resolved by walking through resetting
+`SITE_PASSWORD` directly in Vercel's dashboard to a new known value, then
+redeploying again.
+
+**Verified no real secrets ever reached the public repo**, prompted by a
+direct question: `git ls-files | grep env` confirms only `.env.example` is
+tracked, and its contents are placeholder-blank aside from the
+already-public Beehiiv publication ID — `.env.local` (holding the real
+`DATABASE_URL`, `BEEHIIV_API_KEY`, `SITE_PASSWORD`) has never been
+committed.
