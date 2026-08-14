@@ -2000,3 +2000,39 @@ zero regressions in the part that was explicitly not supposed to move.
 both show up correctly in the build output (`/` is now dynamic instead of
 statically prerendered, expected since it reads nothing but renders two
 links — no behavior risk from that alone).
+
+## Round 35: one navbar, not two — corrected the content/ads split
+
+Round 34's approach (a separate `AdsNavbar` component, "Marketing Monk
+Ads" branding, reciprocal text-link cross-navigation) wasn't what was
+asked for. Corrected per explicit feedback:
+
+1. **Brand stays "Marketing Monk everywhere"** — deleted
+   `src/components/ads/AdsNavbar.tsx` entirely. There is now exactly one
+   `Navbar` component for both dashboards, not two.
+2. **`Navbar` takes a `section: "content" | "ads"` prop.** Content-only
+   pieces (the Overview/Editions/Subject Line Lab/Retention tabs, the
+   Fetch and Analyze content buttons) are wrapped in
+   `{section === "content" && ...}` and simply don't render for
+   `section="ads"` — same component, same markup, same styling, just
+   conditionally present, rather than a second hand-maintained copy that
+   could drift from the first.
+3. **Replaced the old reciprocal "Ads →" / "← Content" text links with a
+   single toggle button**, positioned immediately to the left of Log
+   out/Log in in both sections: it reads "Ads" while on the content side
+   and "Content" while on the ads side, always pointing at the other
+   section. The Marketing Monk logo now links to whichever section
+   you're currently in (`/overview` or `/ads`) rather than always
+   forcing you back to `/overview`.
+4. `src/app/ads/layout.tsx` now renders the shared `Navbar` with
+   `section="ads"` instead of the deleted `AdsNavbar`.
+
+**Verified in the browser**: content dashboard renders exactly as before
+with "Ads" now sitting directly left of "Log out"; navigating to `/ads`
+confirms no content tabs, no Fetch/Analyze content buttons, brand still
+reads "Marketing Monk," and the toggle correctly reads "Content"; clicked
+back and forth in both directions and confirmed the URL actually changes
+each time (one click briefly landed on a stale element reference from the
+browser-automation tool, not an app bug — direct navigation and a
+fresh-reference click both confirmed the toggle works correctly).
+`npx tsc --noEmit`, `eslint`, and `next build` all clean.
