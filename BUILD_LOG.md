@@ -2036,3 +2036,71 @@ each time (one click briefly landed on a stale element reference from the
 browser-automation tool, not an app bug — direct navigation and a
 fresh-reference click both confirmed the toggle works correctly).
 `npx tsc --noEmit`, `eslint`, and `next build` all clean.
+
+## Round 36: Ads dashboard layout
+
+User supplied a reference HTML file (a one-off Meta Ads reporting
+dashboard built for a different project — "JAPM", campaign
+Claude_Leadmagnet) and asked for the layout to take inspiration from it.
+Its colors turned out to already match this app's palette almost exactly
+(`#FF5500`/`#FFB800`/`#0D0D0D`), which made adapting it straightforward.
+Borrowed the structural ideas — a filters bar, a KPI row, a spend/leads
+trend chart, a country donut, a sortable breakdown table — but rebuilt
+everything against this app's actual component library (`Card`,
+`Eyebrow`, `StatCard`, `EmptyState` from `ui.tsx`) and SVG chart pattern
+(`OverviewChart.tsx`'s bar+line combo), not the reference's raw CSS or
+Chart.js. One deliberate departure: replaced the reference's
+"impressions vs clicks" panel with "Meta leads vs real Beehiiv
+subscribers" — the reference was a generic single-platform report; ours
+exists specifically to show the gap between what Meta counts as a lead
+and what Beehiiv confirms as a real subscriber, so that comparison earned
+the full-width panel instead.
+
+**Explicitly layout-only, per the ask** — no Meta client, no Beehiiv
+cross-reference, no Fetch button yet (that's still the next round). Every
+component was built to render correctly against an empty array rather
+than fake data, matching this app's established convention (`Editions`,
+`ContentQualityPanel`, etc. all do the same). Built:
+
+1. **`src/lib/ads/types.ts`** — `AdCampaignRow` (Meta fields + nullable
+   Beehiiv fields + nullable `beehiivUtmMedium` mapping, matching Round
+   33/34's decisions) and `AdDailyPoint`, plus `metaCostPerLead`,
+   `trueAcquisitionCost`, `ctr` as pure functions rather than inlined math
+   scattered across components.
+2. **`DualSeriesTrendChart.tsx`** — extracted the bar+line SVG pattern out
+   of `OverviewChart.tsx` into a reusable, parameterized version, since
+   the ads page needs it twice (spend vs. leads; leads vs. subscribers)
+   and duplicating ~150 lines of axis/hover/tooltip logic twice wasn't
+   worth avoiding one shared component.
+3. **`BreakdownDonut.tsx`** — a new multi-slice donut (leads by country),
+   distinct from the existing `QualityDonuts.tsx` which draws one
+   single-value ring per category, not a shared-whole pie.
+4. **`AdsDashboard.tsx`** — the main client component, same architecture
+   as `EditionsExplorer.tsx`: owns filter state (search, date range,
+   country) and derives KPIs/chart data/sorted table rows from it. Six
+   KPI cards including a highlighted "True acquisition cost" card (spend
+   ÷ real Beehiiv subscribers — the actual number this whole feature
+   exists to produce), a sortable campaigns table.
+5. **`src/app/ads/page.tsx`** rewritten to pass empty `campaigns`/
+   `dailySeries` arrays into `AdsDashboard`.
+
+**Caught and fixed a real lint error before it shipped**: the donut's
+cumulative-angle-offset logic used a `let offset` mutated inside
+`.map()`, which the React Compiler ESLint rule correctly flags as unsafe
+(reassigning a render-scoped variable across renders). Rewrote as a
+`reduce` that computes each segment's prior-offset from the accumulator
+instead of a closed-over mutable variable.
+
+**Also caught, self-review**: after building the page, re-checked it
+against the still-standing "no em dashes or en dashes anywhere on the
+site" rule from Round 31 — found six places using a bare "—" as the
+conventional empty-value placeholder (stat cards, table cells, chart
+tooltip). Swapped all of them for "N/A" before calling this done, rather
+than treating that rule as scoped only to prose.
+
+**Verified in the browser**: full page renders cleanly with honest empty
+states throughout (KPIs show "N/A"/"₹0"/"0", charts and the table show
+explicit "no data yet" messaging, not blank space or placeholder
+numbers), all filters render as real interactive controls, no console
+errors. Confirmed zero regression on `/overview` immediately after.
+`npx tsc --noEmit`, `eslint`, and `next build` all clean.
