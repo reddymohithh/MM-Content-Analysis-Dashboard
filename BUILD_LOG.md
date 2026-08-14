@@ -1845,3 +1845,94 @@ tracked, and its contents are placeholder-blank aside from the
 already-public Beehiiv publication ID — `.env.local` (holding the real
 `DATABASE_URL`, `BEEHIIV_API_KEY`, `SITE_PASSWORD`) has never been
 committed.
+
+## Round 33: planning a new feature area — Meta Ads + SparkLoop acquisition-cost analysis
+
+New scope, distinct from editorial content analysis: automate the
+currently-manual process of cross-referencing Meta Ads spend against real
+Beehiiv subscriber counts (and later SparkLoop) to get a true acquisition
+cost per campaign, plus the open rate/CTR of the subscribers each campaign
+actually brought in. The stated example: Meta says 100 leads at ₹30 CPL
+(₹3,000 total), but only 80 of those become real Beehiiv subscribers, so
+the real acquisition cost is ₹37.50, not ₹30.
+
+Standing instructions given for this new work: build and verify locally
+before anything goes live (same discipline as the rest of the project),
+and update this log immediately after every chat turn, not batched at the
+end of a round.
+
+**This was a planning round, not an implementation one** — asked "how do
+we plan on taking this forward," so before proposing a data model I
+verified what's actually real using the Meta Ads MCP and Beehiiv MCP
+available in this chat session (a live grounding pass, not a guess from
+memory — same practice as the original Beehiiv integration at the start of
+this project).
+
+**Important architectural note surfaced immediately**: the Meta Ads and
+Beehiiv MCP tools used for this research exist only inside this chat
+session. The deployed Next.js app can't call them — it needs its own
+direct API credentials (a Meta Marketing API access token, a SparkLoop API
+key), the same pattern as the existing `BEEHIIV_API_KEY`.
+
+**Confirmed on the Meta side**, against the real "Marketing Monk Current"
+ad account (id `624496083171435`, active, INR): campaign/ad set/ad `name`,
+`amount_spent`, `impressions`, `actions:link_click`, `ctr`, `lead`, and
+`cost_per_lead` are all real, queryable fields at campaign/adset/ad level,
+with `publisher_platform`/`platform_position` (placement) and
+`country`/`region`/`dma` (location) available as breakdowns — one
+breakdown per API call, not combinable in a single request. Two real
+caveats found by pulling actual data, not assumed: `lead` is `null` on
+several real campaigns (non-lead-gen objectives, e.g. "Creativetesting",
+"AIMarketingSkills"), and the ad creative's destination URL — where UTM
+parameters would live — isn't reliably exposed for Page-post-style ads;
+pulled a real creative and `link_url` was simply absent from the response.
+
+**Confirmed on the Beehiiv side — this de-risks the hardest part of the
+ask.** Beehiiv already captures `utm_source`, `utm_medium`, `utm_campaign`,
+`utm_content`, and `utm_term` as first-class per-subscriber attributes at
+signup (confirmed via `get_segment_schema`), and the account's 76 existing
+segments are literally built on this: pulled one real segment
+(`seg_8a8d09c0...`) and its filter is
+`where: "utm_source = 'meta' AND utm_medium = 'mm_usa_top6skills'"`,
+returning exactly `num_members`, `open_rate`, `click_through_rate`,
+verified click-through rate, and `pct_unsubscribed` — precisely the
+"real subscribers from this campaign, and how they engaged" numbers the
+whole feature needs. This means subscriber-level attribution doesn't need
+to be built from scratch; it's already computed by Beehiiv's own segment
+engine and just needs to be read.
+
+**The one real gap**: a Meta campaign's name (e.g.
+`TOF_MM_USA_AIMarketingSkills_31-7-26`) is not the same string as its
+Beehiiv `utm_medium` (e.g. `mm_usa_top6skills`), and that value can't be
+reliably pulled back off the Meta side per the creative-URL finding above
+— something has to connect the two.
+
+**Three decisions made before any code gets written:**
+
+1. **Campaign ↔ segment mapping**: manual, entered once per campaign in
+   the app itself — far lighter than today's full manual process, and
+   doesn't depend on unreliable Meta creative-URL scraping. (Considered
+   and rejected: enforcing a new naming convention where `utm_medium`
+   always equals the campaign name going forward — would break matching
+   for every campaign that already exists; and attempting to
+   auto-resolve UTM values from Meta's underlying post objects — real
+   complexity for uncertain payoff given what was already observed.)
+2. **What counts as "leads" on the Meta side**: native `lead` metric
+   where the campaign has it, falling back to link clicks where it
+   doesn't, with the app clearly labeling which metric is in play per
+   campaign so the comparison is never silently misleading.
+3. **SparkLoop**: not live yet, and there's no MCP or prior research for
+   it (unlike Meta Ads and Beehiiv, both already integrated or explored
+   this session). User has real SparkLoop API credentials — asked them to
+   add `SPARKLOOP_API_KEY` to `.env.local` (same pattern as every other
+   secret in this project) rather than pasting it into the chat, so it can
+   be researched the same evidence-first way once available: real
+   exploratory calls against the live API before any schema gets designed
+   around it.
+
+**Not yet decided / next step**: the actual data model, the new page's
+UI, and the manual-trigger pattern (recommended to match the existing
+Fetch/Analyze content precedent, not yet explicitly confirmed) are all
+still open until the SparkLoop research pass happens — deliberately
+sequencing "understand all three data sources" before "design the schema
+that has to hold all three."
