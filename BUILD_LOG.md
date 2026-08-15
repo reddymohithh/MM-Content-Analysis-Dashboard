@@ -2699,3 +2699,47 @@ while the lower panel's Beehiiv number (548) is unchanged, on the same
 unfiltered page load -- proving the two are now independent values, not
 a shared duplicate render. Confirmed the Mapping page renders with zero
 regression. `npx tsc --noEmit`, `eslint`, and `next build` all clean.
+
+## Round 46: dropped two more captions, made the Mapping page's date window fixed, added mapping edit
+
+1. **Removed two more captions** per direct instruction: "No mapping
+   covers this selection yet" (Beehiiv subscribers card sub-text) and
+   "Spend ÷ real Beehiiv subscribers" (True acquisition cost card
+   sub-text). Both cards now show just the number with no explanatory
+   line under it.
+2. **Confirmed, no change needed**: True acquisition cost was already
+   `spend ÷ beehiivSubscribersMapped` (Round 45), and the Mapping page's
+   per-mapping "Cost / acquisition" under Beehiiv was already `spend
+   (from Ads Manager) ÷ leads (from Beehiiv)` -- both match what was
+   asked for exactly, so nothing to touch there.
+3. **Removed the date range filter from the Mapping page.** The two
+   date inputs above the Mappings list are gone; the per-mapping Ads
+   Manager metrics now always read the last 28 days internally (the
+   same default the filter used to open on), just no longer exposed as
+   something to change on this page.
+4. **Added mapping edit, with the reason for its absence stated first**
+   as asked: there was no edit path because the backend only ever had
+   two operations, `POST` (create) and `DELETE` (by id) --
+   `src/app/api/ads/mappings/[id]/route.ts` had no `PATCH` handler at
+   all, and the UI's "Build a mapping" form only ever called `POST`.
+   Added a `PATCH` handler (same validation as `POST`, updates the
+   existing row in place instead of inserting a new one) and wired an
+   "Edit" button next to "Delete" on each mapping card. Clicking it
+   loads that mapping's real campaign/ad sets/ads/segments back into
+   the build form (now labeled "Edit mapping"), scrolls to it, and
+   swaps the submit button to "Save changes" with a "Cancel" link next
+   to it that resets the form without saving.
+
+**Verified in the browser**: confirmed both captions are gone. Confirmed
+the Mapping page has no date controls above the Mappings list. Built a
+throwaway test mapping through the real UI flow, clicked Edit, switched
+its ad set (which correctly pruned the now-invalid ad selection,
+same cascade logic as the create flow) and ad, saved, then confirmed
+directly against the database that the *same* mapping id was updated in
+place with the new ad set/ad -- not a duplicate row -- before deleting
+it. Also noticed and left alone a mapping the user had created for real
+between rounds; confirmed editing/testing never touched it and it's
+still the only row left in `ad_mappings` afterward. Confirmed
+`/overview` (content dashboard) and the rest of the Ads Overview page
+still render with zero regression. `npx tsc --noEmit`, `eslint`, and
+`next build` all clean.

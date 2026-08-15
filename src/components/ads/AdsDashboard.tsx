@@ -421,13 +421,8 @@ export function AdsDashboard({
         <StatCard
           label="Beehiiv subscribers"
           value={beehiivSubscribersMapped !== null ? beehiivSubscribersMapped.toLocaleString() : "N/A"}
-          sub={beehiivSubscribersMapped === null ? "No mapping covers this selection yet" : undefined}
         />
-        <GradientStatCard
-          label="True acquisition cost"
-          value={trueCac !== null ? money(trueCac) : "N/A"}
-          sub="Spend ÷ real Beehiiv subscribers"
-        />
+        <GradientStatCard label="True acquisition cost" value={trueCac !== null ? money(trueCac) : "N/A"} />
       </div>
 
       <Card className="mb-4">

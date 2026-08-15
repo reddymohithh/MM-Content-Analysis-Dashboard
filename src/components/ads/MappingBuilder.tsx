@@ -7,9 +7,6 @@ import { MultiSelectDropdown } from "./MultiSelectDropdown";
 import { SingleSelectDropdown } from "./SingleSelectDropdown";
 import type { CampaignWithChildren, SegmentOption, MappingWithNames, AdDailyMetricRow } from "@/lib/ads/data";
 
-const dateCls =
-  "w-full rounded-lg border border-border bg-card px-2.5 py-1.5 text-[12.5px] text-text-faint outline-none focus:border-orange";
-
 const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 const percent = (n: number) => `${n.toFixed(2)}%`;
 
@@ -28,7 +25,8 @@ function toISODate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** Same default window the Overview page opens on. */
+/** Same default window the Overview page opens on. Not user-adjustable
+ * here -- the Mappings list always reads the last 28 days. */
 function last28Days(): { from: string; to: string } {
   const to = new Date();
   const from = new Date(to);
@@ -54,8 +52,8 @@ export function MappingBuilder({
   const [segmentIds, setSegmentIds] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [metricsFrom, setMetricsFrom] = useState(() => last28Days().from);
-  const [metricsTo, setMetricsTo] = useState(() => last28Days().to);
+  const [editingMappingId, setEditingMappingId] = useState<string | null>(null);
+  const { from: metricsFrom, to: metricsTo } = useMemo(() => last28Days(), []);
 
   const selectedCampaign = campaigns.find((c) => c.id === campaignId) ?? null;
 
@@ -87,33 +85,52 @@ export function MappingBuilder({
   const canSubmit =
     campaignId !== "" && adSetIds.size > 0 && adIds.size > 0 && segmentIds.size > 0 && !submitting;
 
-  async function createMapping() {
+  function resetForm() {
+    setCampaignId("");
+    setAdSetIds(new Set());
+    setAdIds(new Set());
+    setSegmentIds(new Set());
+    setEditingMappingId(null);
+    setError(null);
+  }
+
+  function startEdit(m: MappingWithNames) {
+    setCampaignId(m.campaignId);
+    setAdSetIds(new Set(m.adSetIds));
+    setAdIds(new Set(m.adIds));
+    setSegmentIds(new Set(m.segmentIds));
+    setEditingMappingId(m.id);
+    setError(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function saveMapping() {
     if (!canSubmit) return;
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch("/api/ads/mappings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          campaignId,
-          adSetIds: [...adSetIds],
-          adIds: [...adIds],
-          segmentIds: [...segmentIds],
-        }),
-      });
+      const res = await fetch(
+        editingMappingId ? `/api/ads/mappings/${editingMappingId}` : "/api/ads/mappings",
+        {
+          method: editingMappingId ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            campaignId,
+            adSetIds: [...adSetIds],
+            adIds: [...adIds],
+            segmentIds: [...segmentIds],
+          }),
+        },
+      );
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Could not create the mapping.");
+        setError(data.error ?? "Could not save the mapping.");
         return;
       }
-      setCampaignId("");
-      setAdSetIds(new Set());
-      setAdIds(new Set());
-      setSegmentIds(new Set());
+      resetForm();
       router.refresh();
     } catch {
-      setError("Could not create the mapping. Check the server logs.");
+      setError("Could not save the mapping. Check the server logs.");
     } finally {
       setSubmitting(false);
     }
@@ -121,6 +138,7 @@ export function MappingBuilder({
 
   async function deleteMapping(id: string) {
     await fetch(`/api/ads/mappings/${id}`, { method: "DELETE" });
+    if (editingMappingId === id) resetForm();
     router.refresh();
   }
 
@@ -188,7 +206,7 @@ export function MappingBuilder({
   return (
     <div className="mx-auto max-w-[1120px] space-y-4">
       <Card>
-        <Eyebrow>Build a mapping</Eyebrow>
+        <Eyebrow>{editingMappingId ? "Edit mapping" : "Build a mapping"}</Eyebrow>
         <div className="grid grid-cols-4 gap-3.5">
           <SingleSelectDropdown
             label="1. Campaign"
@@ -238,41 +256,28 @@ export function MappingBuilder({
 
         <div className="mt-4 flex items-center justify-end gap-3">
           {error && <span className="text-[12px] text-negative">{error}</span>}
+          {editingMappingId && (
+            <button
+              type="button"
+              onClick={resetForm}
+              className="text-[12.5px] font-medium text-text-muted hover:text-ink"
+            >
+              Cancel
+            </button>
+          )}
           <button
             type="button"
-            onClick={createMapping}
+            onClick={saveMapping}
             disabled={!canSubmit}
             className="rounded-lg bg-orange px-4 py-2 text-[13px] font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {submitting ? "Creating…" : "Create mapping"}
+            {submitting ? "Saving…" : editingMappingId ? "Save changes" : "Create mapping"}
           </button>
         </div>
       </Card>
 
       <Card>
-        <div className="mb-3 flex items-end justify-between">
-          <Eyebrow>Mappings</Eyebrow>
-          <div>
-            <div className="mb-1 font-mono text-[10px] uppercase tracking-wide text-text-muted">
-              Date range
-            </div>
-            <div className="flex items-center gap-1.5">
-              <input
-                type="date"
-                value={metricsFrom}
-                onChange={(e) => setMetricsFrom(e.target.value)}
-                className={dateCls}
-              />
-              <span className="text-text-faint">to</span>
-              <input
-                type="date"
-                value={metricsTo}
-                onChange={(e) => setMetricsTo(e.target.value)}
-                className={dateCls}
-              />
-            </div>
-          </div>
-        </div>
+        <Eyebrow>Mappings</Eyebrow>
         {mappings.length === 0 ? (
           <EmptyState>No mappings created yet.</EmptyState>
         ) : (
@@ -287,6 +292,13 @@ export function MappingBuilder({
                       <span className="text-[11px] text-text-faint">
                         {m.createdAt.toISOString().slice(0, 10)}
                       </span>
+                      <button
+                        type="button"
+                        onClick={() => startEdit(m)}
+                        className="text-[11px] font-medium text-text-muted hover:text-ink hover:underline"
+                      >
+                        Edit
+                      </button>
                       <button
                         type="button"
                         onClick={() => deleteMapping(m.id)}
