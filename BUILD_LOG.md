@@ -2104,3 +2104,96 @@ explicit "no data yet" messaging, not blank space or placeholder
 numbers), all filters render as real interactive controls, no console
 errors. Confirmed zero regression on `/overview` immediately after.
 `npx tsc --noEmit`, `eslint`, and `next build` all clean.
+
+## Round 37: campaign mapping — real Meta Ads client, real Beehiiv segment sync, and a live-verified REST API surprise
+
+The real integration, not layout this time. New DB tables, a direct Meta
+Marketing API client (not the MCP — that only exists in this chat), real
+Beehiiv segment syncing, a combined navbar "Refresh" button, and the full
+campaign-to-segment mapping page with cascading selection.
+
+**Schema** (`src/lib/db/schema.ts`, migration `drizzle/0004_shallow_mantis.sql`,
+pushed to the local `local-real` branch): `ad_campaigns`, `ad_sets`,
+`meta_ads` (named to avoid colliding with the generic "ads" naming used
+loosely elsewhere), `beehiiv_segments_cache`, and `ad_mappings`. Mappings
+store selected ad-set/ad/segment ids as `jsonb` arrays rather than
+junction tables — deliberately: this is a simple many-to-many tagging
+relationship always read as a whole, not queried relationally, so
+junction tables would add ceremony without buying anything. Names are
+resolved against the other tables at render time (`src/lib/ads/data.ts`),
+never denormalized, so a mapping can't show a stale name.
+
+**Meta Ads client** (`src/lib/meta-ads/client.ts`) — direct Graph API
+calls, pinned to v25.0 after checking what's actually current: v26.0
+shipped 2026-07-29 with documented placement-field quirks, v23.0 hit
+end-of-life 2026-06-09, v25.0 is the newest version with neither problem.
+Needs `META_ACCESS_TOKEN` (a long-lived System User token — not set yet)
+and `META_AD_ACCOUNT_ID` (pre-filled with the real id confirmed during
+Round 33's research, `624496083171435`, "Marketing Monk Current", since
+that part is already known).
+
+**A real, non-obvious finding while building the Beehiiv segments sync**:
+Round 33's segment research used the Beehiiv MCP tool, and its response
+shape doesn't match the real public REST API. Caught this by curling the
+actual endpoint directly before writing `listSegments()` rather than
+trusting the earlier MCP output — good thing, because the raw API:
+- paginates as `{data, page, limit, total_results, total_pages}`, not the
+  cursor-based `{data, has_more, next_cursor}` shape every other endpoint
+  in `beehiiv/client.ts` uses;
+- does **not** return `open_rate`/`clickthrough_rate`/subscriber counts by
+  default at all — confirmed by curling both the list and single-segment
+  endpoints and seeing only `id, name, type, total_results, status,
+  active`. Those numbers only appear with `expand[]=stats`, the same
+  pattern already used for posts elsewhere in this client, confirmed by
+  testing that flag directly. Without this check, the segments feature
+  would have shipped against fields that don't exist in the real API.
+
+**Combined "Refresh"** (`POST /api/ads/refresh`, triggered by a new
+navbar button visible only in the ads section): syncs Meta campaigns/ad
+sets/ads and Beehiiv segments in one click. Deliberately independent,
+not all-or-nothing — Meta isn't configured yet, but that shouldn't block
+refreshing Beehiiv segments, which is fully available. Each side reports
+its own error in the result rather than one missing credential failing
+the whole request.
+
+**Navbar**: added `ADS_TABS` (Overview, Mapping) alongside the existing
+content `TABS`, both driven by the same `section` prop from Round 35 — no
+new navbar component. Added the "Refresh" `NavTriggerButton`, shown only
+for `section="ads"`, reusing the same generic trigger-button component
+Fetch and Analyze content already use.
+
+**Mapping page** (`src/app/ads/mapping/page.tsx` +
+`MappingBuilder.tsx`): a date-range filter on campaign creation date
+("active or inactive campaigns created in this window both appear," per
+the ask — status is shown explicitly as an Active/Inactive pill, not
+just implied); single-select campaign list; ad sets multi-select,
+cascading from the chosen campaign; ads multi-select, cascading from the
+chosen ad sets (deselecting an ad set drops any ads that only belonged to
+it); an independent Beehiiv segments multi-select; a "Create mapping"
+button gated on all four selections being non-empty; and a list of
+existing mappings at the bottom with a delete action. `POST
+/api/ads/mappings` validates and inserts; `DELETE
+/api/ads/mappings/:id` removes.
+
+**Caught a real hook-usage bug via lint before it shipped**: none this
+round beyond the Round 36 donut fix already logged — clean on the first
+pass this time.
+
+**Verified live, as much as possible without a Meta token yet**:
+logged in, clicked "Refresh" — watched it actually run (`POST
+/api/ads/refresh` took 37.1s, logged server-side) and land real data:
+the mapping page's segment list now shows real Beehiiv segments with
+real member counts (127,328 on "1 year subscribed", etc.), each
+correctly labeled Active/Inactive. Confirmed the campaigns section shows
+the honest "no campaigns yet" empty state (Meta not configured) rather
+than erroring. Verified checkbox selection state and the "Create
+mapping" button's disabled/enabled gating both work correctly via direct
+DOM inspection after a couple of browser-automation click misfires
+(same class of stale-reference/dispatch quirk hit earlier this session,
+not an app bug — confirmed by re-testing with JS-triggered clicks, which
+worked immediately). Confirmed zero regression on `/overview`. `npx tsc
+--noEmit`, `eslint`, and `next build` all clean.
+
+**Still needed from the user**: a Meta long-lived System User access
+token (`ads_read` on the ad account) to actually exercise the campaign
+half of Refresh and the cascading campaign -> ad set -> ad selection.

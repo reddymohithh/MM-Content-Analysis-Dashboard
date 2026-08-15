@@ -188,3 +188,100 @@ export const pollTalliesRelations = relations(pollTallies, ({ one }) => ({
     references: [editions.id],
   }),
 }));
+
+// --- Ads (Meta Ads x Beehiiv acquisition-cost dashboard, BUILD_LOG.md
+// Round 33 onward) -----------------------------------------------------------
+
+/** One row per Meta campaign, synced via the navbar "Refresh" button on
+ * the ads dashboard. `status` is Meta's raw status string (e.g. ACTIVE,
+ * PAUSED) — the UI is responsible for labeling it Active/Inactive. */
+export const adCampaigns = pgTable("ad_campaigns", {
+  id: text("id").primaryKey(), // Meta campaign id
+  name: text("name").notNull(),
+  status: text("status").notNull(),
+  objective: text("objective"),
+  createdTime: timestamp("created_time", { withTimezone: true }).notNull(),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const adSets = pgTable("ad_sets", {
+  id: text("id").primaryKey(), // Meta ad set id
+  campaignId: text("campaign_id")
+    .notNull()
+    .references(() => adCampaigns.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  status: text("status").notNull(),
+  createdTime: timestamp("created_time", { withTimezone: true }).notNull(),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Named metaAds, not ads, to avoid colliding with the generic "ads"
+ * naming used loosely elsewhere in this feature area. */
+export const metaAds = pgTable("meta_ads", {
+  id: text("id").primaryKey(), // Meta ad id
+  adSetId: text("ad_set_id")
+    .notNull()
+    .references(() => adSets.id, { onDelete: "cascade" }),
+  campaignId: text("campaign_id")
+    .notNull()
+    .references(() => adCampaigns.id, { onDelete: "cascade" }), // denormalized for simpler queries
+  name: text("name").notNull(),
+  status: text("status").notNull(),
+  createdTime: timestamp("created_time", { withTimezone: true }).notNull(),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const adCampaignsRelations = relations(adCampaigns, ({ many }) => ({
+  adSets: many(adSets),
+  ads: many(metaAds),
+}));
+
+export const adSetsRelations = relations(adSets, ({ one, many }) => ({
+  campaign: one(adCampaigns, { fields: [adSets.campaignId], references: [adCampaigns.id] }),
+  ads: many(metaAds),
+}));
+
+export const metaAdsRelations = relations(metaAds, ({ one }) => ({
+  adSet: one(adSets, { fields: [metaAds.adSetId], references: [adSets.id] }),
+  campaign: one(adCampaigns, { fields: [metaAds.campaignId], references: [adCampaigns.id] }),
+}));
+
+/** Local cache of Beehiiv segments, synced by the same "Refresh" button.
+ * Segments themselves live in Beehiiv (see docs/BUILD_LOG.md Round 37 for
+ * why open_rate/clickthrough_rate need `expand[]=stats`) — this table just
+ * avoids a live Beehiiv call on every mapping-page load. */
+export const beehiivSegmentsCache = pgTable("beehiiv_segments_cache", {
+  id: text("id").primaryKey(), // Beehiiv segment id, e.g. seg_xxxx
+  name: text("name").notNull(),
+  active: boolean("active").notNull(),
+  totalResults: integer("total_results").notNull(), // member count as of last_calculated
+  openRate: doublePrecision("open_rate"),
+  clickThroughRate: doublePrecision("click_through_rate"),
+  lastCalculated: timestamp("last_calculated", { withTimezone: true }),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * One row per "Create mapping" click: a campaign, the ad sets/ads chosen
+ * within it, and the Beehiiv segments they're mapped to. Selections are
+ * stored as id arrays (jsonb) rather than junction tables — this is a
+ * simple many-to-many tagging relationship read as a whole, not queried
+ * relationally, so junction tables would add ceremony without buying
+ * anything. Names are resolved via lookup against adSets/metaAds/
+ * beehiivSegmentsCache at render time, not denormalized here, so a
+ * mapping never shows a stale name.
+ */
+export const adMappings = pgTable("ad_mappings", {
+  id: text("id").primaryKey(), // e.g. `map_<uuid>`
+  campaignId: text("campaign_id")
+    .notNull()
+    .references(() => adCampaigns.id, { onDelete: "cascade" }),
+  adSetIds: jsonb("ad_set_ids").notNull().$type<string[]>(),
+  adIds: jsonb("ad_ids").notNull().$type<string[]>(),
+  segmentIds: jsonb("segment_ids").notNull().$type<string[]>(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const adMappingsRelations = relations(adMappings, ({ one }) => ({
+  campaign: one(adCampaigns, { fields: [adMappings.campaignId], references: [adCampaigns.id] }),
+}));

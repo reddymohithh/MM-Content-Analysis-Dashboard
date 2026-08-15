@@ -11,6 +11,11 @@ const TABS = [
   { href: "/retention", label: "Retention" },
 ];
 
+const ADS_TABS = [
+  { href: "/ads", label: "Overview" },
+  { href: "/ads/mapping", label: "Mapping" },
+];
+
 const inertTriggerButtonClasses =
   "flex flex-shrink-0 cursor-not-allowed items-center gap-1.5 whitespace-nowrap rounded-lg border border-text-faint/40 px-3 py-1.5 text-[12px] font-medium text-text-faint/40";
 
@@ -56,37 +61,37 @@ export function Navbar({
             Marketing Monk
           </Link>
         )}
-        {section === "content" && (
-          <div className="flex items-center gap-1 min-w-0">
-            {TABS.map((tab) => {
-              if (disabled) {
-                return (
-                  <span
-                    key={tab.href}
-                    className="whitespace-nowrap flex-shrink-0 cursor-not-allowed rounded-lg px-3 py-1.5 text-[13px] font-bold text-text-muted/40"
-                  >
-                    {tab.label}
-                  </span>
-                );
-              }
-              const active =
-                pathname === tab.href || pathname.startsWith(`${tab.href}/`);
+        <div className="flex items-center gap-1 min-w-0">
+          {(section === "ads" ? ADS_TABS : TABS).map((tab) => {
+            if (disabled) {
               return (
-                <Link
+                <span
                   key={tab.href}
-                  href={tab.href}
-                  className={`whitespace-nowrap flex-shrink-0 rounded-lg px-3 py-1.5 text-[13px] font-bold no-underline transition-colors ${
-                    active
-                      ? "bg-orange text-ink"
-                      : "text-text-muted hover:text-cream"
-                  }`}
+                  className="whitespace-nowrap flex-shrink-0 cursor-not-allowed rounded-lg px-3 py-1.5 text-[13px] font-bold text-text-muted/40"
                 >
                   {tab.label}
-                </Link>
+                </span>
               );
-            })}
-          </div>
-        )}
+            }
+            const active =
+              tab.href === "/ads"
+                ? pathname === "/ads"
+                : pathname === tab.href || pathname.startsWith(`${tab.href}/`);
+            return (
+              <Link
+                key={tab.href}
+                href={tab.href}
+                className={`whitespace-nowrap flex-shrink-0 rounded-lg px-3 py-1.5 text-[13px] font-bold no-underline transition-colors ${
+                  active
+                    ? "bg-orange text-ink"
+                    : "text-text-muted hover:text-cream"
+                }`}
+              >
+                {tab.label}
+              </Link>
+            );
+          })}
+        </div>
       </div>
 
       <div className="flex flex-shrink-0 items-center gap-2">
@@ -137,6 +142,27 @@ export function Navbar({
                   }
                 />
               </>
+            )}
+            {section === "ads" && (
+              <NavTriggerButton
+                idleLabel="Refresh"
+                runningLabel="Refreshing…"
+                endpoint="/api/ads/refresh"
+                title="Pull campaigns/ad sets/ads from Meta and segments from Beehiiv (requires local API keys)"
+                formatResult={(data) => {
+                  const parts: string[] = [];
+                  if (typeof data.campaigns === "number") {
+                    parts.push(`${data.campaigns} campaigns, ${data.adSets} ad sets, ${data.ads} ads`);
+                  }
+                  if (typeof data.segments === "number") {
+                    parts.push(`${data.segments} segments`);
+                  }
+                  const errors = Array.isArray(data.errors) ? data.errors : [];
+                  return [parts.join(". ") + (parts.length ? "." : ""), ...errors]
+                    .filter(Boolean)
+                    .join(" ");
+                }}
+              />
             )}
             <Link href={section === "content" ? "/ads" : "/overview"} className={sectionToggleClasses}>
               {section === "content" ? "Ads" : "Content"}

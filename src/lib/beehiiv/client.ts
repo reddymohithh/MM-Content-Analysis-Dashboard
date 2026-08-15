@@ -347,6 +347,53 @@ export async function listPostComments(_publicationId: string, _postId: string) 
   return { data: [] as { id: string; author?: string; body: string; created_at: number }[] };
 }
 
+// --- Segments ----------------------------------------------------------------
+
+/**
+ * Confirmed live against the real REST API (not just the MCP tool used for
+ * Round 33's research, whose response shape turned out to be enriched
+ * beyond what this public endpoint actually returns — verified by curling
+ * both the list and single-segment endpoints directly before writing this).
+ *
+ * Two real surprises: (1) this endpoint's pagination is page/limit-based
+ * ({page, limit, total_results, total_pages}), not the cursor-based
+ * {data, has_more, next_cursor} shape every other list endpoint in this
+ * client uses. (2) open_rate/clickthrough_rate/subscriber counts are NOT
+ * included by default — they only appear with `expand[]=stats`, same
+ * pattern as posts.
+ */
+export interface BeehiivSegment {
+  id: string;
+  name: string;
+  type: string;
+  status: string;
+  active: boolean;
+  total_results: number; // member count as of last_calculated
+  last_calculated: number; // unix seconds
+  stats?: {
+    open_rate: number;
+    clickthrough_rate: number;
+    total_subscribers: number;
+    total_sent: number;
+    unsubscribed_rate: number;
+  };
+}
+
+interface SegmentsPage {
+  data: BeehiivSegment[];
+  page: number;
+  limit: number;
+  total_results: number;
+  total_pages: number;
+}
+
+export async function listSegments(publicationId: string) {
+  return beehiivFetch<SegmentsPage>(`/publications/${publicationId}/segments`, {
+    limit: 100,
+    expand: ["stats"],
+  });
+}
+
 // --- Non-editorial link exclusion (see docs/PROJECT_SPEC.md rule 3) --------
 
 const SOCIAL_HOST_PATTERNS = [

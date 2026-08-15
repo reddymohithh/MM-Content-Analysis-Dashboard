@@ -29,6 +29,13 @@
       "when": 1786548078456,
       "tag": "0003_graceful_ken_ellis",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786759316448,
+      "tag": "0004_shallow_mantis",
+      "breakpoints": true
     }
   ]
 }
