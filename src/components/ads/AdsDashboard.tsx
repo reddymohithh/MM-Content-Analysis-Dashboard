@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Card, Eyebrow, EmptyState, StatCard, GradientStatCard } from "@/components/dashboard/ui";
 import { DualSeriesTrendChart } from "./DualSeriesTrendChart";
+import { ImpressionsClicksChart } from "./ImpressionsClicksChart";
 import { MultiSelectDropdown } from "./MultiSelectDropdown";
 import { costPerLead, acquisitionCost } from "@/lib/ads/types";
 import type { CampaignWithChildren, AdDailyMetricRow, MappingForLookup, SegmentOption } from "@/lib/ads/data";
@@ -21,6 +22,19 @@ function toggleId(set: Set<string>, id: string): Set<string> {
   return next;
 }
 
+function toISODate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+/** Same default window Ads Manager itself opens on, so "Meta cost / lead"
+ * reads as the account's current average rather than an all-time figure. */
+function last28Days(): { from: string; to: string } {
+  const to = new Date();
+  const from = new Date(to);
+  from.setDate(from.getDate() - 27);
+  return { from: toISODate(from), to: toISODate(to) };
+}
+
 export function AdsDashboard({
   campaigns,
   dailyMetrics,
@@ -34,8 +48,8 @@ export function AdsDashboard({
   segments: SegmentOption[];
   beehiivFallback: number | null;
 }) {
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [dateFrom, setDateFrom] = useState(() => last28Days().from);
+  const [dateTo, setDateTo] = useState(() => last28Days().to);
   const [campaignIds, setCampaignIds] = useState<Set<string>>(new Set());
   const [adSetIds, setAdSetIds] = useState<Set<string>>(new Set());
   const [adIds, setAdIds] = useState<Set<string>>(new Set());
@@ -87,8 +101,9 @@ export function AdsDashboard({
   }
 
   function resetFilters() {
-    setDateFrom("");
-    setDateTo("");
+    const defaults = last28Days();
+    setDateFrom(defaults.from);
+    setDateTo(defaults.to);
     setCampaignIds(new Set());
     setAdSetIds(new Set());
     setAdIds(new Set());
@@ -152,6 +167,24 @@ export function AdsDashboard({
     return [...byDate.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([date, v]) => ({ label: date.slice(5), bar: v.spend, line: v.leads }));
+  }, [filteredMetrics]);
+
+  const impressionsClicksPoints = useMemo(() => {
+    const byDate = new Map<string, { impressions: number; clicks: number }>();
+    for (const d of filteredMetrics) {
+      const cur = byDate.get(d.date) ?? { impressions: 0, clicks: 0 };
+      cur.impressions += d.impressions;
+      cur.clicks += d.linkClicks;
+      byDate.set(d.date, cur);
+    }
+    return [...byDate.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, v]) => ({
+        label: date.slice(5),
+        impressions: v.impressions,
+        clicks: v.clicks,
+        ctr: v.impressions > 0 ? (v.clicks / v.impressions) * 100 : 0,
+      }));
   }, [filteredMetrics]);
 
   const campaignNameById = useMemo(() => new Map(campaigns.map((c) => [c.id, c.name])), [campaigns]);
@@ -291,7 +324,11 @@ export function AdsDashboard({
       <div className="mb-4 grid grid-cols-5 gap-3">
         <StatCard label="Spend" value={money(totals.spend)} />
         <StatCard label="Meta leads" value={totals.leads.toLocaleString()} />
-        <StatCard label="Meta cost / lead" value={cpl !== null ? money(cpl) : "N/A"} />
+        <StatCard
+          label="Meta cost / lead"
+          value={cpl !== null ? money(cpl) : "N/A"}
+          sub="Ads Manager average, this window"
+        />
         <StatCard
           label="Beehiiv subscribers"
           value={beehiivSubscribers !== null ? beehiivSubscribers.toLocaleString() : "N/A"}
@@ -319,6 +356,16 @@ export function AdsDashboard({
           barFormat={money}
           lineFormat={(v) => v.toLocaleString()}
         />
+      </Card>
+
+      <Card className="mb-4">
+        <Eyebrow>Impressions vs clicks</Eyebrow>
+        <p className="mb-3 text-[11.5px] text-text-muted">
+          Bars = impressions (left) &middot; solid line = link clicks &middot;
+          dashed line = CTR. Clicks and CTR sit on independent scales, so
+          read trend shape here and exact numbers from the tooltip.
+        </p>
+        <ImpressionsClicksChart points={impressionsClicksPoints} />
       </Card>
 
       <Card className="mb-4">

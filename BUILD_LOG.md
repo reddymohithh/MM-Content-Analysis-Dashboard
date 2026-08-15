@@ -2426,3 +2426,75 @@ campaign filter and confirmed spend/leads narrowed further to
 full unfiltered view. Confirmed the Mapping page and `/overview`
 (content dashboard) still render with zero regression. `npx tsc
 --noEmit`, `eslint`, and `next build` all clean.
+
+## Round 42: impressions/clicks/CTR chart, 28-day default window, ad creative fetch confirmed feasible
+
+Three concrete asks plus one research question. Beehiiv logic was
+explicitly put on hold this round ("keep beehiiv numbers on hold... i
+will figure out the logic") so nothing in `getBeehiivMetaSourceTotal()`,
+the mapping lookup, or the Beehiiv KPI cards was touched.
+
+1. **New "Impressions vs clicks" chart**, modeled on a Meta Ads Manager
+   screenshot the user shared (bars = impressions, solid line = clicks,
+   dashed line = CTR). Built `ImpressionsClicksChart.tsx` rather than
+   extending `DualSeriesTrendChart` in place, since it needs a third
+   series with its own independent scale — clicks and CTR live on
+   wildly different magnitudes (tens vs a fraction of a percent) and
+   would be meaningless sharing one axis. Kept the existing chart's
+   honesty pattern: no printed axis numbers claiming a shared scale,
+   just relative trend shape plus exact values in the hover tooltip and
+   a legend. Consulted the dataviz skill's "never dual-axis" rule
+   before building; the existing `DualSeriesTrendChart` already
+   established this exact pattern for spend-vs-leads in Round 36 and
+   ships with no misleading numeric axis at all (only start/end date
+   labels), which sidesteps that rule's actual concern, so this new
+   chart follows the same established, already-accepted app
+   convention rather than introducing a second visual language.
+   Colors reuse the app's existing tokens rather than the screenshot's
+   palette: orange bars (`--color-orange`, same gradient as the
+   existing chart), ink solid line for clicks, `--color-positive` green
+   dashed line for CTR. Both charts derive from the same
+   `filteredMetrics` the KPI cards already compute, grouped by date
+   with `ctr = linkClicks / impressions * 100` — no new data fetch
+   needed, since impressions and link clicks were already part of
+   `ad_daily_metrics` from Round 41.
+2. **Default date range changed from all-time to the last 28 days**,
+   matching Ads Manager's own default window and the request that
+   "Meta cost / lead... is the average cost in the chosen time frame.
+   By default pick last 28 days." Added a `last28Days()` helper (real
+   `new Date()`, not a fixed date) used as the initial `dateFrom`/
+   `dateTo` state and as what "Reset filters" now returns to, instead
+   of clearing back to an unfiltered all-time view. Added a "Ads
+   Manager average, this window" sub-label under the Meta cost/lead
+   card so it's explicit that number is a Meta-sourced average for
+   whatever window is selected, not a fixed lifetime figure.
+3. **Investigated ad copy/creative fetching via the Meta Ads MCP**
+   (research only, not built this round — the ask was "see if you can
+   fetch," not a spec for where it should live in the UI).
+   `ads_get_creatives` confirmed real, complete data is available per
+   creative: `body` (primary text), `title` (headline), `image_url`,
+   `thumbnail_url`, `call_to_action_type`, and (for video creatives)
+   a `video_id` resolvable via `ads_get_ad_videos`. Pulled one real
+   creative from the account as proof (id `2468917250186452`, "The
+   Skills You're Missing Are Holding You Back") and got back the full
+   primary text, headline, and a live image URL. This is fetchable
+   through the same direct Graph API client already built
+   (`src/lib/meta-ads/client.ts`, `v25.0`) once `META_ACCESS_TOKEN` is
+   set locally — same story as every other real-data piece in this
+   feature. Reported findings back to the user rather than building a
+   creative-preview UI unprompted, since the right surface for it
+   (inline in the campaign table, a dedicated gallery, per-ad detail)
+   wasn't specified and is a real product decision, not an obvious
+   default.
+
+**Verified in the browser**: `/ads` opened with the campaign/ad set/ad
+filters cleared and confirmed the date range defaulted to 2026-07-19
+through 2026-08-14 (28 days back from the app's current date), with
+spend/leads/CPL narrowed accordingly (₹1,36,943 spend, 385 leads, ₹356
+cost/lead) versus Round 41's all-time figures. Confirmed the new chart
+renders bars, solid clicks line, and dashed CTR line with a working
+legend, and that hovering a bar shows correctly computed real values
+(1,553 impressions, 107 clicks, 6.89% CTR) rather than the misleading
+scale in the reference screenshot. Confirmed the Mapping page and
+`/overview` (content dashboard) still render with zero regression.
+`npx tsc --noEmit`, `eslint`, and `next build` all clean.
