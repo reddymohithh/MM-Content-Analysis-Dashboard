@@ -78,6 +78,15 @@ export interface MetaAdSet {
   created_time: string;
 }
 
+export interface MetaAdCreative {
+  title?: string;
+  body?: string;
+  image_url?: string;
+  thumbnail_url?: string;
+  video_id?: string;
+  call_to_action_type?: string;
+}
+
 export interface MetaAd {
   id: string;
   name: string;
@@ -85,6 +94,7 @@ export interface MetaAd {
   adset_id: string;
   campaign_id: string;
   created_time: string;
+  creative?: MetaAdCreative;
 }
 
 function adAccountId(): string {
@@ -103,9 +113,16 @@ export async function listAdSets(): Promise<MetaAdSet[]> {
   });
 }
 
+/**
+ * `creative{...}` is a Graph API field-expansion, not a separate endpoint
+ * (confirmed against the account via the Ads MCP in Round 43) -- pulling
+ * it here means the ad copy and image/video sync in the same paginated
+ * call as everything else, no per-ad round trip.
+ */
 export async function listAds(): Promise<MetaAd[]> {
   return metaFetchAll<MetaAd>(`/act_${adAccountId()}/ads`, {
-    fields: "id,name,status,adset_id,campaign_id,created_time",
+    fields:
+      "id,name,status,adset_id,campaign_id,created_time,creative{title,body,image_url,thumbnail_url,video_id,call_to_action_type}",
   });
 }
 

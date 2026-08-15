@@ -2498,3 +2498,76 @@ legend, and that hovering a bar shows correctly computed real values
 scale in the reference screenshot. Confirmed the Mapping page and
 `/overview` (content dashboard) still render with zero regression.
 `npx tsc --noEmit`, `eslint`, and `next build` all clean.
+
+## Round 43: fixed the date range filter's layout, added a Campaign/Ad set/Ads drill-down with real ad creative previews
+
+Two requests: the date range filter wasn't laid out correctly, and the
+"Campaigns" table at the bottom needed to become a real three-level
+drill-down (Campaign, Ad set, Ads) where clicking an ad in the Ads view
+opens a popup with that ad's actual creative and copy pulled from Ads
+Manager.
+
+1. **Date range layout fix.** The filter card was `grid-cols-4` with
+   Campaign/Ad set/Ad dropdowns and Date range sharing one row -- Date
+   range needed two side-by-side date inputs plus a "to" label in that
+   same cramped column, which overflowed the card's right edge (visibly
+   spilling past the white card onto the cream background). Restructured
+   to `grid-cols-3` for the three dropdowns on their own row, with Date
+   range moved to a second row below a hairline divider, sharing that
+   row with the "Reset filters" button via `justify-between` -- the same
+   pattern the Mapping page's own date filter already uses successfully
+   in its own dedicated Card.
+2. **Ad creative fetching, confirmed feasible in Round 42, now actually
+   wired up.** Extended `metaAds` (migration
+   `drizzle/0008_nervous_lucky_pierre.sql`) with nullable
+   `creative_title`/`creative_body`/`creative_image_url`/
+   `creative_thumbnail_url`/`creative_video_id`/`creative_call_to_action`
+   columns. The production path is a single field-expansion on the
+   existing `/ads` list call --
+   `creative{title,body,image_url,thumbnail_url,video_id,call_to_action_type}`
+   -- confirmed against the real account that Graph API supports this
+   directly, so `listAds()` and `syncMetaAdsData()` now sync creative
+   data in the same paginated call as everything else once
+   `META_ACCESS_TOKEN` exists, no extra round trips. For today: used
+   `ads_get_ad_entities` (fields `creative_id`) to get the real
+   creative id for the account's top 20 ads by spend, then
+   `ads_get_creatives` with those 20 ids in one batched call to pull
+   full title/body/image/thumbnail/CTA -- both real Meta Ads MCP calls
+   against the live account, not fabricated. Learned the hard way that
+   fbcdn image URLs are signed (`_nc_ohc`/`oh`/`oe` query params) and
+   silently break if truncated, so wrote the raw JSON to scratch files
+   verbatim rather than hand-retyping the URLs, then a one-off bridge
+   script joined ad id to creative by id and updated the 20 rows (script
+   run, then deleted, per the established pattern).
+3. **Campaigns table became a three-level drill-down.** Added a
+   Campaign/Ad set/Ads tab switcher above the table; each level
+   aggregates the same filtered `ad_daily_metrics` rows by
+   campaignId/adSetId/adId respectively, with Beehiiv coverage
+   resolved at the matching granularity (ad-set rows require the
+   mapping's `adSetIds` to include that row's ad set; ad rows require
+   both the ad set and the specific ad id) rather than reusing the
+   coarser campaign-level match. Refactored the row type and sort logic
+   into a shared `BreakdownRow`/`sortRows` used by all three levels
+   instead of three near-duplicate table implementations.
+4. **Ad creative popup.** Ads-level rows are clickable, opening a new
+   `AdCreativeModal.tsx` with the real image (or video thumbnail, since
+   playing the video itself would need a separate signed-URL fetch this
+   round didn't build), headline, body copy, and CTA button, sourced
+   directly from the campaigns prop already loaded server-side (no
+   extra fetch on click). Ads outside today's 20-ad backfill honestly
+   show "No creative synced yet for this ad" instead of a blank or
+   fabricated card.
+
+**Verified in the browser**: confirmed the date range now sits cleanly
+inside the card at 1280px width with Reset filters aligned right, no
+overflow. Switched between Campaign/Ad set/Ads tabs and confirmed each
+shows real, differently-aggregated rows (e.g. "TheMap" ad row: ₹37,615
+spend, 129 leads within the 28-day window). Clicked an ad row from the
+account's top-20-by-spend backfill and confirmed the modal renders the
+real creative image ("THE MAP TO AI MARKETING MASTERY"), headline
+"Your AI Marketing Roadmap", full body copy, and Download CTA exactly
+as returned by the Ads MCP. Clicked an ad outside that backfill and
+confirmed the honest "No creative synced yet" empty state instead of a
+blank popup. Confirmed the Mapping page and `/overview` (content
+dashboard) still render with zero regression. `npx tsc --noEmit`,
+`eslint`, and `next build` all clean.

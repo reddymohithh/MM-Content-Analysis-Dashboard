@@ -60,6 +60,14 @@ export async function syncMetaAdsData(): Promise<MetaAdsSyncResult> {
   }
 
   for (const a of ads) {
+    const creative = {
+      creativeTitle: a.creative?.title ?? null,
+      creativeBody: a.creative?.body ?? null,
+      creativeImageUrl: a.creative?.image_url ?? null,
+      creativeThumbnailUrl: a.creative?.thumbnail_url ?? null,
+      creativeVideoId: a.creative?.video_id ?? null,
+      creativeCallToAction: a.creative?.call_to_action_type ?? null,
+    };
     await db
       .insert(metaAds)
       .values({
@@ -69,10 +77,11 @@ export async function syncMetaAdsData(): Promise<MetaAdsSyncResult> {
         name: a.name,
         status: a.status,
         createdTime: new Date(a.created_time),
+        ...creative,
       })
       .onConflictDoUpdate({
         target: metaAds.id,
-        set: { name: a.name, status: a.status, syncedAt: new Date() },
+        set: { name: a.name, status: a.status, syncedAt: new Date(), ...creative },
       });
   }
 

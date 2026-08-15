@@ -229,6 +229,15 @@ export const metaAds = pgTable("meta_ads", {
   status: text("status").notNull(),
   createdTime: timestamp("created_time", { withTimezone: true }).notNull(),
   syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+  // Creative fields (Round 43) -- nullable, since not every ad has had its
+  // creative synced yet. `creativeTitle`/`creativeBody` are the Graph API's
+  // own field names (Ads Manager labels them "headline"/"primary text").
+  creativeTitle: text("creative_title"),
+  creativeBody: text("creative_body"),
+  creativeImageUrl: text("creative_image_url"),
+  creativeThumbnailUrl: text("creative_thumbnail_url"),
+  creativeVideoId: text("creative_video_id"),
+  creativeCallToAction: text("creative_call_to_action"),
 });
 
 export const adCampaignsRelations = relations(adCampaigns, ({ many }) => ({

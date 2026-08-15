@@ -3,6 +3,15 @@ import { desc } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { adCampaigns, beehiivSegmentsCache, adMappings } from "@/lib/db/schema";
 
+export interface AdCreative {
+  title: string | null;
+  body: string | null;
+  imageUrl: string | null;
+  thumbnailUrl: string | null;
+  videoId: string | null;
+  callToAction: string | null;
+}
+
 export interface CampaignWithChildren {
   id: string;
   name: string;
@@ -10,7 +19,7 @@ export interface CampaignWithChildren {
   objective: string | null;
   createdTime: Date;
   adSets: { id: string; name: string; status: string }[];
-  ads: { id: string; adSetId: string; name: string; status: string }[];
+  ads: { id: string; adSetId: string; name: string; status: string; creative: AdCreative }[];
 }
 
 export async function getCampaignsWithChildren(): Promise<CampaignWithChildren[]> {
@@ -25,7 +34,20 @@ export async function getCampaignsWithChildren(): Promise<CampaignWithChildren[]
     objective: c.objective,
     createdTime: c.createdTime,
     adSets: c.adSets.map((s) => ({ id: s.id, name: s.name, status: s.status })),
-    ads: c.ads.map((a) => ({ id: a.id, adSetId: a.adSetId, name: a.name, status: a.status })),
+    ads: c.ads.map((a) => ({
+      id: a.id,
+      adSetId: a.adSetId,
+      name: a.name,
+      status: a.status,
+      creative: {
+        title: a.creativeTitle,
+        body: a.creativeBody,
+        imageUrl: a.creativeImageUrl,
+        thumbnailUrl: a.creativeThumbnailUrl,
+        videoId: a.creativeVideoId,
+        callToAction: a.creativeCallToAction,
+      },
+    })),
   }));
 }
 

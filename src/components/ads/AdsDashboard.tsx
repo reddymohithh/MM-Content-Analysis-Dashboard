@@ -5,8 +5,9 @@ import { Card, Eyebrow, EmptyState, StatCard, GradientStatCard } from "@/compone
 import { DualSeriesTrendChart } from "./DualSeriesTrendChart";
 import { ImpressionsClicksChart } from "./ImpressionsClicksChart";
 import { MultiSelectDropdown } from "./MultiSelectDropdown";
+import { AdCreativeModal } from "./AdCreativeModal";
 import { costPerLead, acquisitionCost } from "@/lib/ads/types";
-import type { CampaignWithChildren, AdDailyMetricRow, MappingForLookup, SegmentOption } from "@/lib/ads/data";
+import type { CampaignWithChildren, AdDailyMetricRow, MappingForLookup, SegmentOption, AdCreative } from "@/lib/ads/data";
 
 const dateCls =
   "w-full rounded-lg border border-border bg-card px-2.5 py-1.5 text-[12.5px] text-text-faint outline-none focus:border-orange";
@@ -14,12 +15,64 @@ const dateCls =
 const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 
 type SortKey = "name" | "spend" | "metaLeads" | "metaCpl" | "beehiivSubscribers" | "trueCac";
+type BreakdownLevel = "campaign" | "adSet" | "ad";
+
+interface BreakdownRow {
+  id: string;
+  name: string;
+  status?: string;
+  spend: number;
+  metaLeads: number;
+  beehiivSubscribers: number | null;
+  creative?: AdCreative;
+}
+
+function sortRows(rows: BreakdownRow[], sortKey: SortKey, sortDir: 1 | -1): BreakdownRow[] {
+  const sorted = [...rows];
+  sorted.sort((a, b) => {
+    let x: number | string, y: number | string;
+    switch (sortKey) {
+      case "name":
+        return a.name.localeCompare(b.name) * sortDir;
+      case "metaCpl":
+        x = costPerLead(a.spend, a.metaLeads) ?? Infinity;
+        y = costPerLead(b.spend, b.metaLeads) ?? Infinity;
+        break;
+      case "trueCac":
+        x = acquisitionCost(a.spend, a.beehiivSubscribers) ?? Infinity;
+        y = acquisitionCost(b.spend, b.beehiivSubscribers) ?? Infinity;
+        break;
+      case "beehiivSubscribers":
+        x = a.beehiivSubscribers ?? -1;
+        y = b.beehiivSubscribers ?? -1;
+        break;
+      case "spend":
+        x = a.spend;
+        y = b.spend;
+        break;
+      default:
+        x = a.metaLeads;
+        y = b.metaLeads;
+    }
+    return ((x as number) - (y as number)) * sortDir;
+  });
+  return sorted;
+}
 
 function toggleId(set: Set<string>, id: string): Set<string> {
   const next = new Set(set);
   if (next.has(id)) next.delete(id);
   else next.add(id);
   return next;
+}
+
+function segmentSum(matchingSegmentIds: Set<string>, segmentTotalsById: Map<string, number>): number | null {
+  if (matchingSegmentIds.size === 0) return null;
+  let sum = 0;
+  matchingSegmentIds.forEach((id) => {
+    sum += segmentTotalsById.get(id) ?? 0;
+  });
+  return sum;
 }
 
 function toISODate(d: Date): string {
@@ -55,6 +108,8 @@ export function AdsDashboard({
   const [adIds, setAdIds] = useState<Set<string>>(new Set());
   const [sortKey, setSortKey] = useState<SortKey>("spend");
   const [sortDir, setSortDir] = useState<1 | -1>(-1);
+  const [breakdownLevel, setBreakdownLevel] = useState<BreakdownLevel>("campaign");
+  const [modalAdId, setModalAdId] = useState<string | null>(null);
 
   const allAdSets = useMemo(
     () => campaigns.flatMap((c) => c.adSets.map((s) => ({ ...s, campaignId: c.id }))),
@@ -188,8 +243,10 @@ export function AdsDashboard({
   }, [filteredMetrics]);
 
   const campaignNameById = useMemo(() => new Map(campaigns.map((c) => [c.id, c.name])), [campaigns]);
+  const adSetInfoById = useMemo(() => new Map(allAdSets.map((s) => [s.id, s])), [allAdSets]);
+  const adInfoById = useMemo(() => new Map(allAds.map((a) => [a.id, a])), [allAds]);
 
-  const perCampaignRows = useMemo(() => {
+  const perCampaignRows = useMemo((): BreakdownRow[] => {
     const byCampaign = new Map<string, { spend: number; metaLeads: number }>();
     for (const d of filteredMetrics) {
       const cur = byCampaign.get(d.campaignId) ?? { spend: 0, metaLeads: 0 };
@@ -197,7 +254,7 @@ export function AdsDashboard({
       cur.metaLeads += d.leads;
       byCampaign.set(d.campaignId, cur);
     }
-    const rows = [...byCampaign.entries()].map(([campaignId, agg]) => {
+    return [...byCampaign.entries()].map(([campaignId, agg]) => {
       const matchingSegmentIds = new Set<string>();
       for (const m of mappings) {
         if (m.campaignId !== campaignId) continue;
@@ -205,49 +262,81 @@ export function AdsDashboard({
         if (adIds.size > 0 && !m.adIds.some((id) => adIds.has(id))) continue;
         m.segmentIds.forEach((id) => matchingSegmentIds.add(id));
       }
-      let subs: number | null = null;
-      if (matchingSegmentIds.size > 0) {
-        subs = 0;
-        matchingSegmentIds.forEach((id) => {
-          subs! += segmentTotalsById.get(id) ?? 0;
-        });
-      }
       return {
         id: campaignId,
         name: campaignNameById.get(campaignId) ?? "(unknown campaign)",
         spend: agg.spend,
         metaLeads: agg.metaLeads,
-        beehiivSubscribers: subs,
+        beehiivSubscribers: segmentSum(matchingSegmentIds, segmentTotalsById),
       };
     });
+  }, [filteredMetrics, mappings, adSetIds, adIds, segmentTotalsById, campaignNameById]);
 
-    rows.sort((a, b) => {
-      let x: number | string, y: number | string;
-      switch (sortKey) {
-        case "name":
-          x = a.name;
-          y = b.name;
-          return x.localeCompare(y) * sortDir;
-        case "metaCpl":
-          x = costPerLead(a.spend, a.metaLeads) ?? Infinity;
-          y = costPerLead(b.spend, b.metaLeads) ?? Infinity;
-          break;
-        case "trueCac":
-          x = acquisitionCost(a.spend, a.beehiivSubscribers) ?? Infinity;
-          y = acquisitionCost(b.spend, b.beehiivSubscribers) ?? Infinity;
-          break;
-        case "beehiivSubscribers":
-          x = a.beehiivSubscribers ?? -1;
-          y = b.beehiivSubscribers ?? -1;
-          break;
-        default:
-          x = a[sortKey];
-          y = b[sortKey];
+  const perAdSetRows = useMemo((): BreakdownRow[] => {
+    const byAdSet = new Map<string, { spend: number; metaLeads: number }>();
+    for (const d of filteredMetrics) {
+      const cur = byAdSet.get(d.adSetId) ?? { spend: 0, metaLeads: 0 };
+      cur.spend += d.spend;
+      cur.metaLeads += d.leads;
+      byAdSet.set(d.adSetId, cur);
+    }
+    return [...byAdSet.entries()].map(([adSetId, agg]) => {
+      const info = adSetInfoById.get(adSetId);
+      const matchingSegmentIds = new Set<string>();
+      for (const m of mappings) {
+        if (m.campaignId !== info?.campaignId) continue;
+        if (!m.adSetIds.includes(adSetId)) continue;
+        if (adIds.size > 0 && !m.adIds.some((id) => adIds.has(id))) continue;
+        m.segmentIds.forEach((id) => matchingSegmentIds.add(id));
       }
-      return ((x as number) - (y as number)) * sortDir;
+      return {
+        id: adSetId,
+        name: info?.name ?? "(unknown ad set)",
+        status: info?.status,
+        spend: agg.spend,
+        metaLeads: agg.metaLeads,
+        beehiivSubscribers: segmentSum(matchingSegmentIds, segmentTotalsById),
+      };
     });
-    return rows;
-  }, [filteredMetrics, mappings, adSetIds, adIds, segmentTotalsById, campaignNameById, sortKey, sortDir]);
+  }, [filteredMetrics, mappings, adIds, segmentTotalsById, adSetInfoById]);
+
+  const perAdRows = useMemo((): BreakdownRow[] => {
+    const byAd = new Map<string, { spend: number; metaLeads: number }>();
+    for (const d of filteredMetrics) {
+      const cur = byAd.get(d.adId) ?? { spend: 0, metaLeads: 0 };
+      cur.spend += d.spend;
+      cur.metaLeads += d.leads;
+      byAd.set(d.adId, cur);
+    }
+    return [...byAd.entries()].map(([adId, agg]) => {
+      const info = adInfoById.get(adId);
+      const matchingSegmentIds = new Set<string>();
+      for (const m of mappings) {
+        if (m.campaignId !== info?.campaignId) continue;
+        if (!info || !m.adSetIds.includes(info.adSetId)) continue;
+        if (!m.adIds.includes(adId)) continue;
+        m.segmentIds.forEach((id) => matchingSegmentIds.add(id));
+      }
+      return {
+        id: adId,
+        name: info?.name ?? "(unknown ad)",
+        status: info?.status,
+        spend: agg.spend,
+        metaLeads: agg.metaLeads,
+        beehiivSubscribers: segmentSum(matchingSegmentIds, segmentTotalsById),
+        creative: info?.creative,
+      };
+    });
+  }, [filteredMetrics, mappings, segmentTotalsById, adInfoById]);
+
+  const breakdownRowsByLevel: Record<BreakdownLevel, BreakdownRow[]> = {
+    campaign: perCampaignRows,
+    adSet: perAdSetRows,
+    ad: perAdRows,
+  };
+  const breakdownRows = sortRows(breakdownRowsByLevel[breakdownLevel], sortKey, sortDir);
+  const breakdownColumnLabel = breakdownLevel === "campaign" ? "Campaign" : breakdownLevel === "adSet" ? "Ad set" : "Ad";
+  const modalAd = modalAdId !== null ? adInfoById.get(modalAdId) : undefined;
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -261,7 +350,7 @@ export function AdsDashboard({
   return (
     <div className="mx-auto max-w-[1120px]">
       <Card className="mb-4">
-        <div className="grid grid-cols-4 gap-3.5">
+        <div className="grid grid-cols-3 gap-3.5">
           <MultiSelectDropdown
             label="Campaign"
             options={campaigns.map((c) => ({ id: c.id, label: c.name, sub: c.status === "ACTIVE" ? "Active" : "Inactive" }))}
@@ -289,6 +378,8 @@ export function AdsDashboard({
             disabled={availableAds.length === 0}
             disabledReason="No ads available"
           />
+        </div>
+        <div className="mt-3.5 flex items-end justify-between border-t border-hairline pt-3.5">
           <div>
             <div className="mb-1 font-mono text-[10px] uppercase tracking-wide text-text-muted">
               Date range
@@ -309,8 +400,6 @@ export function AdsDashboard({
               />
             </div>
           </div>
-        </div>
-        <div className="mt-3 flex justify-end">
           <button
             type="button"
             onClick={resetFilters}
@@ -396,14 +485,44 @@ export function AdsDashboard({
       </Card>
 
       <Card>
-        <Eyebrow>Campaigns</Eyebrow>
+        <div className="mb-3 flex items-center justify-between">
+          <Eyebrow>{breakdownColumnLabel}s</Eyebrow>
+          <div className="flex gap-1 rounded-lg bg-card-soft p-1">
+            {(
+              [
+                ["campaign", "Campaign"],
+                ["adSet", "Ad set"],
+                ["ad", "Ads"],
+              ] as [BreakdownLevel, string][]
+            ).map(([level, label]) => (
+              <button
+                key={level}
+                type="button"
+                onClick={() => setBreakdownLevel(level)}
+                className={`rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${
+                  breakdownLevel === level
+                    ? "bg-card text-ink shadow-sm"
+                    : "text-text-muted hover:text-ink"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {breakdownLevel === "ad" && (
+          <p className="mb-3 text-[11.5px] text-text-muted">
+            Click a row to see the real ad creative and copy from Ads
+            Manager.
+          </p>
+        )}
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-[12.5px]">
             <thead>
               <tr className="bg-card-soft">
                 {(
                   [
-                    ["name", "Campaign"],
+                    ["name", breakdownColumnLabel],
                     ["spend", "Spend"],
                     ["metaLeads", "Meta leads"],
                     ["metaCpl", "Meta CPL"],
@@ -425,26 +544,33 @@ export function AdsDashboard({
               </tr>
             </thead>
             <tbody>
-              {perCampaignRows.length === 0 ? (
+              {breakdownRows.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-3.5 py-8">
                     <EmptyState>No spend in this window. Try a wider date range or fewer filters.</EmptyState>
                   </td>
                 </tr>
               ) : (
-                perCampaignRows.map((c) => {
-                  const rowCpl = costPerLead(c.spend, c.metaLeads);
-                  const cac = acquisitionCost(c.spend, c.beehiivSubscribers);
+                breakdownRows.map((row) => {
+                  const rowCpl = costPerLead(row.spend, row.metaLeads);
+                  const cac = acquisitionCost(row.spend, row.beehiivSubscribers);
+                  const clickable = breakdownLevel === "ad";
                   return (
-                    <tr key={c.id} className="border-b border-border last:border-0 hover:bg-card-soft">
+                    <tr
+                      key={row.id}
+                      onClick={clickable ? () => setModalAdId(row.id) : undefined}
+                      className={`border-b border-border last:border-0 hover:bg-card-soft ${
+                        clickable ? "cursor-pointer" : ""
+                      }`}
+                    >
                       <td className="px-3.5 py-2.5">
-                        <div className="font-medium">{c.name}</div>
+                        <div className="font-medium">{row.name}</div>
                       </td>
-                      <td className="px-3.5 py-2.5 text-right">{money(c.spend)}</td>
-                      <td className="px-3.5 py-2.5 text-right">{c.metaLeads.toLocaleString()}</td>
+                      <td className="px-3.5 py-2.5 text-right">{money(row.spend)}</td>
+                      <td className="px-3.5 py-2.5 text-right">{row.metaLeads.toLocaleString()}</td>
                       <td className="px-3.5 py-2.5 text-right">{rowCpl !== null ? money(rowCpl) : "N/A"}</td>
                       <td className="px-3.5 py-2.5 text-right">
-                        {c.beehiivSubscribers !== null ? c.beehiivSubscribers.toLocaleString() : "N/A"}
+                        {row.beehiivSubscribers !== null ? row.beehiivSubscribers.toLocaleString() : "N/A"}
                       </td>
                       <td className="px-3.5 py-2.5 text-right">
                         {cac !== null ? (
@@ -461,6 +587,15 @@ export function AdsDashboard({
           </table>
         </div>
       </Card>
+
+      {modalAd && (
+        <AdCreativeModal
+          adName={modalAd.name}
+          adStatus={modalAd.status}
+          creative={modalAd.creative}
+          onClose={() => setModalAdId(null)}
+        />
+      )}
     </div>
   );
 }
