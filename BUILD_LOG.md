@@ -2743,3 +2743,33 @@ still the only row left in `ad_mappings` afterward. Confirmed
 `/overview` (content dashboard) and the rest of the Ads Overview page
 still render with zero regression. `npx tsc --noEmit`, `eslint`, and
 `next build` all clean.
+
+## Round 47: extended the ad creative backfill from 20 ads to all 82
+
+User flagged (with a screenshot) that most ads still showed "No creative
+synced yet" in the modal -- expected given Round 43 only backfilled the
+top 20 ads by spend, but worth fixing properly now rather than leaving
+it as a known gap. Data-only round, no code changes.
+
+Same real pipeline as Round 43, just run against the remaining 62 ads:
+`ads_get_ad_entities` (fields `id`, `creative_id`) to get every synced
+ad's real creative id (batched, with a follow-up call for 4 ads that
+fell outside the first page), then `ads_get_creatives` with those ids
+to pull full title/body/image/thumbnail/CTA. Two of the response
+batches exceeded the MCP's inline token limit and were saved to files
+by the harness instead of returned directly -- copied those files into
+the scratchpad verbatim (rather than re-requesting smaller pages or
+transcribing by hand) and parsed them with `json.load`, which sidesteps
+any risk of truncating one of the long signed image URLs mid-string.
+Wrote a second one-off bridge script joining ad id to creative by id,
+ran it (80/80 rows matched and updated -- some ads share a creative, so
+80 distinct id→creative writes covered the 62 previously-missing ads
+plus a few already-covered ones getting refreshed), then deleted the
+script per the established convention.
+
+**Verified in the browser**: confirmed `meta_ads` now has creative data
+on all 82 rows, not 82/20. Opened the exact ad from the user's
+screenshot ("Trending Skills in 2026") and confirmed the modal now
+renders its real creative image and copy instead of the empty state.
+`npx tsc --noEmit`, `eslint`, and `next build` all clean (no source
+files changed this round).
