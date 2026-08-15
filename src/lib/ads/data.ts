@@ -56,6 +56,8 @@ export interface SegmentOption {
   name: string;
   active: boolean;
   totalResults: number;
+  openRate: number | null;
+  clickThroughRate: number | null;
 }
 
 export async function getBeehiivSegmentOptions(): Promise<SegmentOption[]> {
@@ -67,14 +69,20 @@ export async function getBeehiivSegmentOptions(): Promise<SegmentOption[]> {
     name: r.name,
     active: r.active,
     totalResults: r.totalResults,
+    openRate: r.openRate,
+    clickThroughRate: r.clickThroughRate,
   }));
 }
 
 export interface MappingWithNames {
   id: string;
+  campaignId: string;
   campaignName: string;
+  adSetIds: string[];
   adSetNames: string[];
+  adIds: string[];
   adNames: string[];
+  segmentIds: string[];
   segmentNames: string[];
   createdAt: Date;
 }
@@ -95,9 +103,13 @@ export async function getMappingsWithNames(): Promise<MappingWithNames[]> {
 
   return mappings.map((m) => ({
     id: m.id,
+    campaignId: m.campaignId,
     campaignName: campaignName.get(m.campaignId) ?? "(deleted campaign)",
+    adSetIds: m.adSetIds,
     adSetNames: m.adSetIds.map((id) => adSetName.get(id) ?? "(deleted ad set)"),
+    adIds: m.adIds,
     adNames: m.adIds.map((id) => adName.get(id) ?? "(deleted ad)"),
+    segmentIds: m.segmentIds,
     segmentNames: m.segmentIds.map((id) => segmentName.get(id) ?? "(deleted segment)"),
     createdAt: m.createdAt,
   }));

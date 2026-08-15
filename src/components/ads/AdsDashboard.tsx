@@ -413,11 +413,7 @@ export function AdsDashboard({
       <div className="mb-4 grid grid-cols-5 gap-3">
         <StatCard label="Spend" value={money(totals.spend)} />
         <StatCard label="Meta leads" value={totals.leads.toLocaleString()} />
-        <StatCard
-          label="Meta cost / lead"
-          value={cpl !== null ? money(cpl) : "N/A"}
-          sub="Ads Manager average, this window"
-        />
+        <StatCard label="Meta cost / lead (AVG)" value={cpl !== null ? money(cpl) : "N/A"} />
         <StatCard
           label="Beehiiv subscribers"
           value={beehiivSubscribers !== null ? beehiivSubscribers.toLocaleString() : "N/A"}
@@ -449,11 +445,6 @@ export function AdsDashboard({
 
       <Card className="mb-4">
         <Eyebrow>Impressions vs clicks</Eyebrow>
-        <p className="mb-3 text-[11.5px] text-text-muted">
-          Bars = impressions (left) &middot; solid line = link clicks &middot;
-          dashed line = CTR. Clicks and CTR sit on independent scales, so
-          read trend shape here and exact numbers from the tooltip.
-        </p>
         <ImpressionsClicksChart points={impressionsClicksPoints} />
       </Card>
 
@@ -510,12 +501,6 @@ export function AdsDashboard({
             ))}
           </div>
         </div>
-        {breakdownLevel === "ad" && (
-          <p className="mb-3 text-[11.5px] text-text-muted">
-            Click a row to see the real ad creative and copy from Ads
-            Manager.
-          </p>
-        )}
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-[12.5px]">
             <thead>

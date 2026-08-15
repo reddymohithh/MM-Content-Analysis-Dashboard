@@ -2571,3 +2571,74 @@ confirmed the honest "No creative synced yet" empty state instead of a
 blank popup. Confirmed the Mapping page and `/overview` (content
 dashboard) still render with zero regression. `npx tsc --noEmit`,
 `eslint`, and `next build` all clean.
+
+## Round 44: trimmed captions, Mapping page's Campaign field matches the other dropdowns, mappings now show real Ads Manager + Beehiiv metrics
+
+Five small cleanups plus one real feature: once a mapping exists, it
+should actually show what it's for -- real spend/leads/cost-per-acquisition
+from Ads Manager, and real leads/cost-per-acquisition/open-rate/CTR from
+Beehiiv, both reacting to a date range (default last 28 days, same
+convention as the Overview page).
+
+1. **Caption cleanup.** Removed three explanatory paragraphs the user
+   found unnecessary: "Click a row to see the real ad creative..." under
+   the Ads breakdown tab, "Bars = impressions (left)..." under the
+   Impressions vs clicks chart, and the "Ads Manager average, this
+   window" sub-label under the Meta cost/lead card -- folded that same
+   information into the label itself instead, which is now "Meta cost /
+   lead (AVG)".
+2. **Mapping page decluttered.** Removed the "Campaign date range" card
+   entirely (heading, caption, and the date filter that narrowed the
+   Campaign dropdown by creation date) -- the Campaign dropdown now
+   simply lists every campaign, unfiltered.
+3. **Campaign field now matches the other three dropdowns.** It was a
+   native `<select>`; the Ad sets/Ads/Beehiiv segments fields next to it
+   are the custom `MultiSelectDropdown` (styled button + panel). Since a
+   mapping only ever has one campaign, multi-select checkboxes would be
+   the wrong affordance, so built `SingleSelectDropdown.tsx` instead --
+   same button/panel visual language and colors, but radio-style: picking
+   an option replaces the selection and closes the panel immediately
+   (multi-select stays open so you can keep picking).
+4. **Real per-mapping metrics.** Extended `SegmentOption`
+   (`src/lib/ads/data.ts`) with `openRate`/`clickThroughRate` (already
+   cached on `beehiivSegmentsCache` since Round 37, just not exposed to
+   this page before) and `MappingWithNames` with the raw
+   `campaignId`/`adSetIds`/`adIds`/`segmentIds` alongside the resolved
+   names, since computing metrics needs the ids, not just display text.
+   The Mapping page now also fetches `getAdDailyMetricRows()`. Each
+   mapping card shows two panels: "Ads Manager" (Spend, Leads, Cost /
+   acquisition -- summed from `ad_daily_metrics` rows matching that
+   mapping's campaign/ad sets/ads, filtered to a new date range control
+   above the Mappings list that defaults to the last 28 days) and
+   "Beehiiv" (Leads = summed `totalResults` across the mapping's
+   segments, Cost / acquisition = the same window's spend divided by
+   that, Open rate and CTR = each segment's cached rate weighted by its
+   `totalResults` when a mapping covers more than one segment). Beehiiv's
+   three non-lead numbers intentionally don't move with the date range,
+   consistent with the established honesty pattern that segment stats
+   aren't sliced by day -- only the spend feeding into the shared "cost
+   per acquisition" figure does.
+5. **Verified with a real mapping, not a mock.** Standing instruction is
+   that mapping creation is the user's own curation action, never
+   something to improvise for a demo. To verify the new metrics logic
+   without leaving a fake mapping behind, built one real, temporary
+   mapping through the actual UI flow using real synced entities
+   (campaign `TOF_MM_USA_ScalingCampaign_03-08-2026`, one real ad set/ad,
+   the real "1 year subscribed" segment, 127,341 members), confirmed the
+   card rendered ₹816 spend / 0 leads / N/A CPA on the Ads Manager side
+   and 127,341 leads / ₹0 CPA / 32.24% open rate / 1.24% CTR on the
+   Beehiiv side, confirmed narrowing the date range to a window with no
+   underlying data correctly zeroed the Ads Manager spend out (proving
+   the filter is real, not decorative), then deleted the mapping through
+   the same UI the user would use and confirmed directly against the
+   database that `ad_mappings` is back to zero rows -- the app is left
+   exactly as honest as it was before this check.
+
+**Verified in the browser**: confirmed all three captions are gone and
+the Meta cost/lead card reads "(AVG)". Confirmed the Mapping page opens
+straight into "Build a mapping" with no date-range card above it, and
+the Campaign field opens the same button+panel dropdown as the other
+three fields. Ran the full create/verify/delete cycle described above
+against real data. Confirmed `/overview` (content dashboard) and the
+rest of the Ads Overview page still render with zero regression. `npx
+tsc --noEmit`, `eslint`, and `next build` all clean.
