@@ -1,17 +1,21 @@
 import { PageTitle } from "@/components/dashboard/ui";
 import { AdsDashboard } from "@/components/ads/AdsDashboard";
-import type { AdCampaignRow, AdDailyPoint } from "@/lib/ads/types";
+import { getMetaTotals, getBeehiivMetaSourceTotal } from "@/lib/ads/data";
+import type { AdCampaignRow } from "@/lib/ads/types";
 
 export const dynamic = "force-dynamic";
 
-// Empty until the Meta Ads client + Beehiiv cross-reference are wired up
-// (BUILD_LOG.md, next round). This page is layout only for now — every
-// component here is built to render correctly with zero rows rather than
-// faked data.
+// Per-campaign metrics aren't wired up yet -- the campaign table stays an
+// honest empty state until that's built. The account-wide totals above
+// it (metaTotals / beehiivMetaSubscribers) are real, from the database.
 const campaigns: AdCampaignRow[] = [];
-const dailySeries: AdDailyPoint[] = [];
 
-export default function AdsOverviewPage() {
+export default async function AdsOverviewPage() {
+  const [metaTotals, beehiivMetaSubscribers] = await Promise.all([
+    getMetaTotals(),
+    getBeehiivMetaSourceTotal(),
+  ]);
+
   return (
     <div>
       <div className="mx-auto max-w-[1120px]">
@@ -20,7 +24,11 @@ export default function AdsOverviewPage() {
           caption="Meta Ads spend, cross-referenced against real Beehiiv subscriber outcomes. SparkLoop joins once v3 API access is granted."
         />
       </div>
-      <AdsDashboard campaigns={campaigns} dailySeries={dailySeries} />
+      <AdsDashboard
+        campaigns={campaigns}
+        metaTotals={metaTotals}
+        beehiivMetaSubscribers={beehiivMetaSubscribers}
+      />
     </div>
   );
 }

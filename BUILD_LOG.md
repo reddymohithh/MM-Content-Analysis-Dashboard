@@ -2259,3 +2259,70 @@ commit — this round only changed data, not code).
 automated "Refresh" button still needs the real `META_ACCESS_TOKEN` to
 keep this data current going forward, and still won't have it until the
 user's Meta Business Settings request goes through.
+
+## Round 40: real account-wide numbers on Overview, trimmed both pages
+
+**Mapping page**: removed the "Campaign mapping" title and caption per
+direct request — the page now opens straight on the date filter.
+
+**Overview page — real numbers, not layout.** Asked for "Meta leads vs
+real Beehiiv subscribers" to show real numbers from Ads Manager and
+Beehiiv where the subscriber source is Meta. This meant actually wiring
+data, not more layout:
+
+1. **Confirmed a hard API limitation before building against it**: curled
+   Beehiiv's segment endpoints directly (list and single, with and
+   without every `expand[]` variant tried) and confirmed the public REST
+   API never returns a segment's filter/`where` clause — that field only
+   ever appeared via the MCP tool's own (differently-shaped) output back
+   in Round 33. So "which segment tracks Meta-sourced subscribers"
+   can't be determined programmatically from the filter itself; the only
+   real signal left is the human-authored naming convention already in
+   use ("Meta Source - <window> (Overall)", "Meta Medium: <slug>
+   (Overall)", etc.). `getBeehiivMetaSourceTotal()`
+   (`src/lib/ads/data.ts`) matches on that pattern and takes the largest
+   match (the broadest combined window) rather than summing every "Meta
+   Source" segment, since the narrower monthly ones are subsets of the
+   combined one, not additional subscribers — summing them would have
+   double-counted.
+2. **New `ad_meta_totals` table** (singleton row, migration
+   `drizzle/0005_useful_iceman.sql`): account-wide lifetime spend/leads/
+   impressions/link clicks. Added `getAccountTotals()` to the Meta
+   client, hitting the real `/act_<id>/insights` endpoint — a genuinely
+   different endpoint shape than the entity-list one already built:
+   Insights returns spend/impressions directly but leads only inside a
+   generic `actions[]` array of `{action_type, value}` pairs, which the
+   MCP's `ads_get_ad_entities` had been quietly resolving as a
+   convenience (`lead` field) — the raw Graph API doesn't do that
+   resolution for you. Wired into `syncMetaAdsData()` so real Refreshes
+   keep it current once the token exists.
+3. **Manually bridged real numbers today**, same pattern as Round 39:
+   pulled the account's real lifetime totals live via the Meta Ads MCP
+   (₹37,63,742.37 spend, 559 leads, 76,723,247 impressions, 463,303 link
+   clicks) and one-time-seeded `ad_meta_totals` with them (script written,
+   run, deleted).
+4. **Overview page rewrite**: removed the Country filter and its
+   supporting state, removed the "Beehiiv open rate" KPI card and the
+   "Meta leads by country" donut (and deleted `BreakdownDonut.tsx`
+   entirely — confirmed via grep it had no other callers, so keeping it
+   around would've been dead code). "Meta leads vs real Beehiiv
+   subscribers" is now two real numbers side by side (559 vs 535) instead
+   of an always-empty daily trend chart, with an explicit caption noting
+   the two figures cover different windows (Meta is lifetime, Beehiiv is
+   whatever date range the "Meta Source (Overall)" segment itself
+   covers) rather than implying a false apples-to-apples comparison. The
+   top KPI row (Spend, Meta leads, Meta cost/lead, Beehiiv subscribers,
+   True acquisition cost) now reads from these same real account totals
+   instead of the still-empty per-campaign array, so the page doesn't
+   show 0 at the top and real numbers lower down. The per-campaign
+   breakdown table is untouched and still an honest empty state —
+   per-campaign metrics and mapping-based per-campaign Beehiiv numbers
+   are a separate, not-yet-built piece.
+
+**Verified in the browser**: Overview shows real ₹37,63,742 spend, 559
+Meta leads, ₹6,733 cost/lead, 535 Beehiiv subscribers, ₹7,035 true
+acquisition cost, and the comparison panel reads 559 vs 535 with the
+caveat text. Filters bar confirmed down to just Search + Date range.
+Mapping page confirmed no title block. Confirmed zero regression on
+`/overview` (content dashboard). `npx tsc --noEmit`, `eslint`, and
+`next build` all clean.

@@ -108,3 +108,40 @@ export async function listAds(): Promise<MetaAd[]> {
     fields: "id,name,status,adset_id,campaign_id,created_time",
   });
 }
+
+export interface MetaAccountTotals {
+  spend: number;
+  leads: number;
+  impressions: number;
+  linkClicks: number;
+}
+
+interface InsightsRow {
+  spend?: string;
+  impressions?: string;
+  inline_link_clicks?: string;
+  actions?: { action_type: string; value: string }[];
+}
+
+/**
+ * Account-wide lifetime totals (date_preset=maximum) for the top-level
+ * Meta-vs-Beehiiv comparison. Standard Marketing API Insights endpoint —
+ * `lead` isn't a queryable field here the way the entity-list tool
+ * abstracts it (that's an MCP convenience, not a raw Graph API field);
+ * the real endpoint returns an `actions` array of {action_type, value}
+ * pairs, so the lead count has to be picked out of it by action_type.
+ */
+export async function getAccountTotals(): Promise<MetaAccountTotals> {
+  const result = await metaFetch<{ data: InsightsRow[] }>(`/act_${adAccountId()}/insights`, {
+    fields: "spend,impressions,inline_link_clicks,actions",
+    date_preset: "maximum",
+  });
+  const row = result.data[0];
+  const leadAction = row?.actions?.find((a) => a.action_type === "lead");
+  return {
+    spend: row?.spend ? parseFloat(row.spend) : 0,
+    leads: leadAction ? parseInt(leadAction.value, 10) : 0,
+    impressions: row?.impressions ? parseInt(row.impressions, 10) : 0,
+    linkClicks: row?.inline_link_clicks ? parseInt(row.inline_link_clicks, 10) : 0,
+  };
+}

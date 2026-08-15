@@ -1,7 +1,7 @@
 import "server-only";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { adCampaigns, beehiivSegmentsCache, adMappings } from "@/lib/db/schema";
+import { adCampaigns, beehiivSegmentsCache, adMappings, adMetaTotals } from "@/lib/db/schema";
 
 export interface CampaignWithChildren {
   id: string;
@@ -79,4 +79,43 @@ export async function getMappingsWithNames(): Promise<MappingWithNames[]> {
     segmentNames: m.segmentIds.map((id) => segmentName.get(id) ?? "(deleted segment)"),
     createdAt: m.createdAt,
   }));
+}
+
+export interface MetaTotals {
+  spend: number;
+  leads: number;
+  impressions: number;
+  linkClicks: number;
+  capturedAt: Date;
+}
+
+export async function getMetaTotals(): Promise<MetaTotals | null> {
+  const row = await db.query.adMetaTotals.findFirst({
+    where: eq(adMetaTotals.id, "current"),
+  });
+  if (!row) return null;
+  return {
+    spend: row.spend,
+    leads: row.leads,
+    impressions: row.impressions,
+    linkClicks: row.linkClicks,
+    capturedAt: row.capturedAt,
+  };
+}
+
+/**
+ * Beehiiv doesn't expose a segment's filter definition via the public
+ * API (confirmed live, BUILD_LOG.md Round 40) — so "the segment that
+ * tracks all Meta-sourced subscribers" can only be identified by the
+ * naming convention already in use for it ("Meta Source ... (Overall)"),
+ * not by inspecting its actual utm_source filter. Picks the largest such
+ * segment (the broadest/most inclusive date window) rather than summing
+ * every match, since narrower "Meta Source - <month>" segments are
+ * subsets of the combined one, not additional subscribers.
+ */
+export async function getBeehiivMetaSourceTotal(): Promise<number | null> {
+  const rows = await db.query.beehiivSegmentsCache.findMany();
+  const candidates = rows.filter((r) => /^Meta Source.*\(Overall\)$/i.test(r.name));
+  if (candidates.length === 0) return null;
+  return Math.max(...candidates.map((r) => r.totalResults));
 }

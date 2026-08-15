@@ -4,8 +4,8 @@
  * pattern as src/lib/beehiiv/sync.ts.
  */
 import { db } from "@/lib/db";
-import { adCampaigns, adSets, metaAds } from "@/lib/db/schema";
-import { listCampaigns, listAdSets, listAds } from "./client";
+import { adCampaigns, adSets, metaAds, adMetaTotals } from "@/lib/db/schema";
+import { listCampaigns, listAdSets, listAds, getAccountTotals } from "./client";
 
 export interface MetaAdsSyncResult {
   campaigns: number;
@@ -14,11 +14,20 @@ export interface MetaAdsSyncResult {
 }
 
 export async function syncMetaAdsData(): Promise<MetaAdsSyncResult> {
-  const [campaigns, sets, ads] = await Promise.all([
+  const [campaigns, sets, ads, totals] = await Promise.all([
     listCampaigns(),
     listAdSets(),
     listAds(),
+    getAccountTotals(),
   ]);
+
+  await db
+    .insert(adMetaTotals)
+    .values({ id: "current", ...totals })
+    .onConflictDoUpdate({
+      target: adMetaTotals.id,
+      set: { ...totals, capturedAt: new Date() },
+    });
 
   for (const c of campaigns) {
     await db

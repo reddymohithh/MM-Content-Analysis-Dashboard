@@ -285,3 +285,17 @@ export const adMappings = pgTable("ad_mappings", {
 export const adMappingsRelations = relations(adMappings, ({ one }) => ({
   campaign: one(adCampaigns, { fields: [adMappings.campaignId], references: [adCampaigns.id] }),
 }));
+
+/** Singleton row (id always "current") holding account-wide Meta totals —
+ * spend/leads/impressions/link clicks, lifetime (date_preset=maximum) —
+ * refreshed by the same navbar "Refresh" button as everything else in
+ * this feature area. Separate from adCampaigns because these are
+ * time-range-dependent Insights metrics, not static entity attributes. */
+export const adMetaTotals = pgTable("ad_meta_totals", {
+  id: text("id").primaryKey(),
+  spend: doublePrecision("spend").notNull(),
+  leads: integer("leads").notNull(),
+  impressions: integer("impressions").notNull(),
+  linkClicks: integer("link_clicks").notNull(),
+  capturedAt: timestamp("captured_at", { withTimezone: true }).notNull().defaultNow(),
+});
