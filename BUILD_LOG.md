@@ -2222,3 +2222,40 @@ testing), and confirmed the button label updated to "1 selected".
 Confirmed Campaign/Ad sets/Ads all show the correct disabled state and
 reason text with no campaigns synced yet. `npx tsc --noEmit`, `eslint`,
 and `next build` all clean.
+
+## Round 39: manual real-data backfill to unblock testing before the Meta token arrives
+
+User asked directly why campaigns/ad sets/ads can't be fetched from Ads
+Manager. Answered the "why" (the deployed app's "Refresh" button needs
+its own `META_ACCESS_TOKEN`, separate from the chat-only Meta Ads MCP
+tool — same distinction as Round 33), then went further than explaining:
+used that chat-only MCP access to pull real data and load it straight
+into the database myself, so the mapping page is actually usable today
+instead of staying blocked on the token request.
+
+Pulled the full campaign list first (185 campaigns, back to late 2024) —
+too much to usefully carry through chat for a one-time bridge, so scoped
+down to the last ~6 weeks (Jul-Aug 2026): 27 campaigns, then their 41 ad
+sets and 82 ads via a `campaign.id IN [...]` filter (fetching all ad
+sets/ads unfiltered hit the tool's own output-size limit — confirmed by
+actually hitting it, not guessed). Wrote a one-time script
+(`scripts/_seed-recent-meta-data.ts`, upserting via the same
+`onConflictDoUpdate` pattern as the real sync functions) with the exact
+JSON from the live calls, ran it once, deleted it — same
+write-run-delete convention as every other one-off backfill script this
+session (the earlier prod-schema check, the synthetic-data cleanup).
+
+**Verified in the browser**: reloaded the mapping page, confirmed the
+Campaign dropdown lists real campaigns with correct Active/Inactive
+labels ("TOF_MM_USA_ScalingCampaign_03-08-2026 (Active)", etc.), selected
+one, and confirmed the Ad sets dropdown populated with that exact
+campaign's real ad sets ("USA_AI_AdvPlus_Audience" / Active,
+"USA_Marketing_AdvPlus_Audience" / Inactive) — the full campaign -> ad
+set cascade working end-to-end against real data for the first time.
+Confirmed the temp script left no trace (`git status` clean, nothing to
+commit — this round only changed data, not code).
+
+**Still true**: this is a one-time snapshot, not live sync. The
+automated "Refresh" button still needs the real `META_ACCESS_TOKEN` to
+keep this data current going forward, and still won't have it until the
+user's Meta Business Settings request goes through.
