@@ -3,49 +3,16 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, Eyebrow, EmptyState } from "@/components/dashboard/ui";
+import { MultiSelectDropdown } from "./MultiSelectDropdown";
 import type { CampaignWithChildren, SegmentOption, MappingWithNames } from "@/lib/ads/data";
 
 const dateCls =
   "w-full rounded-lg border border-border bg-card px-2.5 py-1.5 text-[12.5px] text-text-faint outline-none focus:border-orange";
+const selectCls =
+  "w-full rounded-lg border border-border bg-card px-3 py-2 text-[12.5px] outline-none focus:border-orange disabled:cursor-not-allowed disabled:opacity-50";
 
-function StatusPill({ status }: { status: string }) {
-  const active = status === "ACTIVE";
-  return (
-    <span
-      className={`inline-block rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${
-        active ? "bg-positive/10 text-positive" : "bg-card-soft text-text-muted"
-      }`}
-    >
-      {active ? "Active" : "Inactive"}
-    </span>
-  );
-}
-
-function CheckboxRow({
-  checked,
-  onChange,
-  label,
-  sub,
-}: {
-  checked: boolean;
-  onChange: () => void;
-  label: string;
-  sub?: string;
-}) {
-  return (
-    <label className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 transition-colors hover:bg-card-soft">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={onChange}
-        className="h-4 w-4 flex-shrink-0 accent-orange"
-      />
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-[12.5px]">{label}</div>
-        {sub && <div className="text-[11px] text-text-faint">{sub}</div>}
-      </div>
-    </label>
-  );
+function statusLabel(status: string) {
+  return status === "ACTIVE" ? "Active" : "Inactive";
 }
 
 function toggle(set: Set<string>, id: string): Set<string> {
@@ -67,7 +34,7 @@ export function MappingBuilder({
   const router = useRouter();
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [campaignId, setCampaignId] = useState<string | null>(null);
+  const [campaignId, setCampaignId] = useState<string>("");
   const [adSetIds, setAdSetIds] = useState<Set<string>>(new Set());
   const [adIds, setAdIds] = useState<Set<string>>(new Set());
   const [segmentIds, setSegmentIds] = useState<Set<string>>(new Set());
@@ -111,7 +78,7 @@ export function MappingBuilder({
   }
 
   const canSubmit =
-    campaignId !== null && adSetIds.size > 0 && adIds.size > 0 && segmentIds.size > 0 && !submitting;
+    campaignId !== "" && adSetIds.size > 0 && adIds.size > 0 && segmentIds.size > 0 && !submitting;
 
   async function createMapping() {
     if (!canSubmit) return;
@@ -133,13 +100,13 @@ export function MappingBuilder({
         setError(data.error ?? "Could not create the mapping.");
         return;
       }
-      setCampaignId(null);
+      setCampaignId("");
       setAdSetIds(new Set());
       setAdIds(new Set());
       setSegmentIds(new Set());
       router.refresh();
     } catch {
-      setError("Could not create the mapping — check the server logs.");
+      setError("Could not create the mapping. Check the server logs.");
     } finally {
       setSubmitting(false);
     }
@@ -155,8 +122,9 @@ export function MappingBuilder({
       <Card>
         <Eyebrow>Campaign date range</Eyebrow>
         <p className="mb-3 text-[11.5px] text-text-muted">
-          Filters which campaigns show up below by when they were created —
-          active or inactive campaigns created in this window both appear.
+          Filters which campaigns appear in the Campaign dropdown below by
+          when they were created. Active or inactive campaigns created in
+          this window both appear.
         </p>
         <div className="flex items-center gap-1.5">
           <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={dateCls} />
@@ -166,115 +134,77 @@ export function MappingBuilder({
       </Card>
 
       <Card>
-        <Eyebrow>1. Campaign</Eyebrow>
-        {filteredCampaigns.length === 0 ? (
-          <EmptyState>
-            No campaigns yet. Click &quot;Refresh&quot; in the navbar to pull
-            campaigns from Meta.
-          </EmptyState>
-        ) : (
-          <div className="max-h-64 space-y-0.5 overflow-y-auto">
-            {filteredCampaigns.map((c) => (
-              <label
-                key={c.id}
-                className={`flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 transition-colors ${
-                  campaignId === c.id ? "bg-card-soft" : "hover:bg-card-soft"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="campaign"
-                  checked={campaignId === c.id}
-                  onChange={() => selectCampaign(c.id)}
-                  className="h-4 w-4 flex-shrink-0 accent-orange"
-                />
-                <div className="min-w-0 flex-1 truncate text-[12.5px]">{c.name}</div>
-                <StatusPill status={c.status} />
-                <div className="flex-shrink-0 text-[11px] text-text-faint">
-                  {c.createdTime.toISOString().slice(0, 10)}
-                </div>
-              </label>
-            ))}
+        <Eyebrow>Build a mapping</Eyebrow>
+        <div className="grid grid-cols-4 gap-3.5">
+          <div>
+            <div className="mb-1 font-mono text-[10px] uppercase tracking-wide text-text-muted">
+              1. Campaign
+            </div>
+            <select
+              value={campaignId}
+              onChange={(e) => selectCampaign(e.target.value)}
+              disabled={filteredCampaigns.length === 0}
+              className={selectCls}
+            >
+              <option value="">
+                {filteredCampaigns.length === 0 ? "No campaigns yet" : "Select a campaign..."}
+              </option>
+              {filteredCampaigns.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} ({statusLabel(c.status)})
+                </option>
+              ))}
+            </select>
           </div>
-        )}
-      </Card>
 
-      {selectedCampaign && (
-        <div className="grid grid-cols-2 gap-3.5">
-          <Card>
-            <Eyebrow>2. Ad sets</Eyebrow>
-            {selectedCampaign.adSets.length === 0 ? (
-              <EmptyState>No ad sets on this campaign.</EmptyState>
-            ) : (
-              <div className="max-h-56 space-y-0.5 overflow-y-auto">
-                {selectedCampaign.adSets.map((s) => (
-                  <CheckboxRow
-                    key={s.id}
-                    checked={adSetIds.has(s.id)}
-                    onChange={() => toggleAdSet(s.id)}
-                    label={s.name}
-                    sub={s.status === "ACTIVE" ? "Active" : "Inactive"}
-                  />
-                ))}
-              </div>
-            )}
-          </Card>
-          <Card>
-            <Eyebrow>3. Ads</Eyebrow>
-            {adSetIds.size === 0 ? (
-              <EmptyState>Select at least one ad set first.</EmptyState>
-            ) : availableAds.length === 0 ? (
-              <EmptyState>No ads on the selected ad sets.</EmptyState>
-            ) : (
-              <div className="max-h-56 space-y-0.5 overflow-y-auto">
-                {availableAds.map((a) => (
-                  <CheckboxRow
-                    key={a.id}
-                    checked={adIds.has(a.id)}
-                    onChange={() => setAdIds((prev) => toggle(prev, a.id))}
-                    label={a.name}
-                    sub={a.status === "ACTIVE" ? "Active" : "Inactive"}
-                  />
-                ))}
-              </div>
-            )}
-          </Card>
+          <MultiSelectDropdown
+            label="2. Ad sets"
+            options={(selectedCampaign?.adSets ?? []).map((s) => ({
+              id: s.id,
+              label: s.name,
+              sub: statusLabel(s.status),
+            }))}
+            selected={adSetIds}
+            onToggle={toggleAdSet}
+            disabled={!selectedCampaign}
+            disabledReason="Pick a campaign first"
+          />
+
+          <MultiSelectDropdown
+            label="3. Ads"
+            options={availableAds.map((a) => ({ id: a.id, label: a.name, sub: statusLabel(a.status) }))}
+            selected={adIds}
+            onToggle={(id) => setAdIds((prev) => toggle(prev, id))}
+            disabled={adSetIds.size === 0}
+            disabledReason="Pick an ad set first"
+          />
+
+          <MultiSelectDropdown
+            label="4. Beehiiv segments"
+            options={segments.map((s) => ({
+              id: s.id,
+              label: s.name,
+              sub: `${s.totalResults.toLocaleString()} members${s.active ? "" : ". Inactive segment"}`,
+            }))}
+            selected={segmentIds}
+            onToggle={(id) => setSegmentIds((prev) => toggle(prev, id))}
+            disabled={segments.length === 0}
+            disabledReason="No segments cached yet"
+          />
         </div>
-      )}
 
-      <Card>
-        <Eyebrow>4. Beehiiv segments</Eyebrow>
-        {segments.length === 0 ? (
-          <EmptyState>
-            No segments cached yet. Click &quot;Refresh&quot; in the navbar to
-            pull segments from Beehiiv.
-          </EmptyState>
-        ) : (
-          <div className="grid max-h-64 grid-cols-2 gap-x-4 overflow-y-auto">
-            {segments.map((s) => (
-              <CheckboxRow
-                key={s.id}
-                checked={segmentIds.has(s.id)}
-                onChange={() => setSegmentIds((prev) => toggle(prev, s.id))}
-                label={s.name}
-                sub={`${s.totalResults.toLocaleString()} members${s.active ? "" : " · inactive segment"}`}
-              />
-            ))}
-          </div>
-        )}
+        <div className="mt-4 flex items-center justify-end gap-3">
+          {error && <span className="text-[12px] text-negative">{error}</span>}
+          <button
+            type="button"
+            onClick={createMapping}
+            disabled={!canSubmit}
+            className="rounded-lg bg-orange px-4 py-2 text-[13px] font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {submitting ? "Creating…" : "Create mapping"}
+          </button>
+        </div>
       </Card>
-
-      <div className="flex items-center justify-end gap-3">
-        {error && <span className="text-[12px] text-negative">{error}</span>}
-        <button
-          type="button"
-          onClick={createMapping}
-          disabled={!canSubmit}
-          className="rounded-lg bg-orange px-4 py-2 text-[13px] font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {submitting ? "Creating…" : "Create mapping"}
-        </button>
-      </div>
 
       <Card>
         <Eyebrow>Mappings</Eyebrow>

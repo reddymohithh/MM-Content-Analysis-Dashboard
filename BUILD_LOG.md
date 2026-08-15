@@ -2197,3 +2197,28 @@ worked immediately). Confirmed zero regression on `/overview`. `npx tsc
 **Still needed from the user**: a Meta long-lived System User access
 token (`ads_read` on the ad account) to actually exercise the campaign
 half of Refresh and the cascading campaign -> ad set -> ad selection.
+
+## Round 38: mapping page selection UI became dropdowns
+
+Direct request: turn the campaign/ad-set/ad/segment selection panels
+into dropdowns. Campaign is a native `<select>` (single-select, no need
+for anything custom). Ad sets, ads, and Beehiiv segments each got a new
+`MultiSelectDropdown.tsx` — one reusable component, not three copies: a
+button showing "N selected" that opens a checkbox panel on click,
+closing on an outside click, the same pattern `AuthMenu.tsx` already
+established for the account menu. All four now sit in a single compact
+"Build a mapping" card as a 4-column row instead of the previous stacked
+full-width panels, with a `disabledReason` prop so a dropdown that isn't
+usable yet ("Pick a campaign first", "No segments cached yet") says why
+inline rather than just going gray.
+
+**Verified in the browser** against the real cached Beehiiv segment data
+from Round 37's Refresh: opened the segments dropdown, confirmed it
+lists real segments with real member counts, selected one via a
+JS-triggered click (physical click-and-check needs a real `mousedown`
+for the outside-click-close listener, which synthetic `.click()` calls
+don't produce — same non-bug already understood from `AuthMenu.tsx`
+testing), and confirmed the button label updated to "1 selected".
+Confirmed Campaign/Ad sets/Ads all show the correct disabled state and
+reason text with no campaigns synced yet. `npx tsc --noEmit`, `eslint`,
+and `next build` all clean.
