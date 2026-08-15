@@ -4,30 +4,23 @@
  * pattern as src/lib/beehiiv/sync.ts.
  */
 import { db } from "@/lib/db";
-import { adCampaigns, adSets, metaAds, adMetaTotals } from "@/lib/db/schema";
-import { listCampaigns, listAdSets, listAds, getAccountTotals } from "./client";
+import { adCampaigns, adSets, metaAds, adDailyMetrics } from "@/lib/db/schema";
+import { listCampaigns, listAdSets, listAds, getAdDailyMetrics } from "./client";
 
 export interface MetaAdsSyncResult {
   campaigns: number;
   adSets: number;
   ads: number;
+  dailyMetrics: number;
 }
 
 export async function syncMetaAdsData(): Promise<MetaAdsSyncResult> {
-  const [campaigns, sets, ads, totals] = await Promise.all([
+  const [campaigns, sets, ads, daily] = await Promise.all([
     listCampaigns(),
     listAdSets(),
     listAds(),
-    getAccountTotals(),
+    getAdDailyMetrics(),
   ]);
-
-  await db
-    .insert(adMetaTotals)
-    .values({ id: "current", ...totals })
-    .onConflictDoUpdate({
-      target: adMetaTotals.id,
-      set: { ...totals, capturedAt: new Date() },
-    });
 
   for (const c of campaigns) {
     await db
@@ -83,5 +76,31 @@ export async function syncMetaAdsData(): Promise<MetaAdsSyncResult> {
       });
   }
 
-  return { campaigns: campaigns.length, adSets: sets.length, ads: ads.length };
+  const validAdIds = new Set(ads.map((a) => a.id));
+  for (const d of daily) {
+    if (!validAdIds.has(d.adId)) continue; // insights can lag entity list by a beat
+    await db
+      .insert(adDailyMetrics)
+      .values({
+        id: `${d.adId}:${d.date}`,
+        adId: d.adId,
+        date: d.date,
+        spend: d.spend,
+        leads: d.leads,
+        impressions: d.impressions,
+        linkClicks: d.linkClicks,
+      })
+      .onConflictDoUpdate({
+        target: adDailyMetrics.id,
+        set: {
+          spend: d.spend,
+          leads: d.leads,
+          impressions: d.impressions,
+          linkClicks: d.linkClicks,
+          syncedAt: new Date(),
+        },
+      });
+  }
+
+  return { campaigns: campaigns.length, adSets: sets.length, ads: ads.length, dailyMetrics: daily.length };
 }

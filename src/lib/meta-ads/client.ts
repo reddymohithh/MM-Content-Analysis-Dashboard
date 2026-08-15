@@ -109,7 +109,9 @@ export async function listAds(): Promise<MetaAd[]> {
   });
 }
 
-export interface MetaAccountTotals {
+export interface MetaAdDailyMetric {
+  adId: string;
+  date: string; // YYYY-MM-DD
   spend: number;
   leads: number;
   impressions: number;
@@ -117,6 +119,8 @@ export interface MetaAccountTotals {
 }
 
 interface InsightsRow {
+  ad_id?: string;
+  date_start?: string;
   spend?: string;
   impressions?: string;
   inline_link_clicks?: string;
@@ -124,24 +128,31 @@ interface InsightsRow {
 }
 
 /**
- * Account-wide lifetime totals (date_preset=maximum) for the top-level
- * Meta-vs-Beehiiv comparison. Standard Marketing API Insights endpoint —
- * `lead` isn't a queryable field here the way the entity-list tool
- * abstracts it (that's an MCP convenience, not a raw Graph API field);
- * the real endpoint returns an `actions` array of {action_type, value}
- * pairs, so the lead count has to be picked out of it by action_type.
+ * Per-ad, per-day rows (level=ad, time_increment=1) for the Overview
+ * dashboard's date-range and Campaign/Ad set/Ad filters, which need real
+ * daily granularity rather than one account-wide lifetime figure
+ * (BUILD_LOG.md Round 41). Same `actions` array parsing as before —
+ * `lead` isn't a queryable field on the raw Insights endpoint, only an
+ * MCP convenience, so it's picked out of `actions` by action_type.
  */
-export async function getAccountTotals(): Promise<MetaAccountTotals> {
-  const result = await metaFetch<{ data: InsightsRow[] }>(`/act_${adAccountId()}/insights`, {
-    fields: "spend,impressions,inline_link_clicks,actions",
-    date_preset: "maximum",
+export async function getAdDailyMetrics(datePreset = "last_90d"): Promise<MetaAdDailyMetric[]> {
+  const rows = await metaFetchAll<InsightsRow>(`/act_${adAccountId()}/insights`, {
+    level: "ad",
+    time_increment: 1,
+    fields: "ad_id,spend,impressions,inline_link_clicks,actions",
+    date_preset: datePreset,
   });
-  const row = result.data[0];
-  const leadAction = row?.actions?.find((a) => a.action_type === "lead");
-  return {
-    spend: row?.spend ? parseFloat(row.spend) : 0,
-    leads: leadAction ? parseInt(leadAction.value, 10) : 0,
-    impressions: row?.impressions ? parseInt(row.impressions, 10) : 0,
-    linkClicks: row?.inline_link_clicks ? parseInt(row.inline_link_clicks, 10) : 0,
-  };
+  return rows
+    .filter((row) => row.ad_id && row.date_start)
+    .map((row) => {
+      const leadAction = row.actions?.find((a) => a.action_type === "lead");
+      return {
+        adId: row.ad_id as string,
+        date: row.date_start as string,
+        spend: row.spend ? parseFloat(row.spend) : 0,
+        leads: leadAction ? parseInt(leadAction.value, 10) : 0,
+        impressions: row.impressions ? parseInt(row.impressions, 10) : 0,
+        linkClicks: row.inline_link_clicks ? parseInt(row.inline_link_clicks, 10) : 0,
+      };
+    });
 }

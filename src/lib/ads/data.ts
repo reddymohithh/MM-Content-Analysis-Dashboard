@@ -1,7 +1,7 @@
 import "server-only";
-import { desc, eq } from "drizzle-orm";
+import { desc } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { adCampaigns, beehiivSegmentsCache, adMappings, adMetaTotals } from "@/lib/db/schema";
+import { adCampaigns, beehiivSegmentsCache, adMappings } from "@/lib/db/schema";
 
 export interface CampaignWithChildren {
   id: string;
@@ -81,26 +81,59 @@ export async function getMappingsWithNames(): Promise<MappingWithNames[]> {
   }));
 }
 
-export interface MetaTotals {
+export interface AdDailyMetricRow {
+  date: string; // YYYY-MM-DD
+  campaignId: string;
+  adSetId: string;
+  adId: string;
   spend: number;
   leads: number;
   impressions: number;
   linkClicks: number;
-  capturedAt: Date;
 }
 
-export async function getMetaTotals(): Promise<MetaTotals | null> {
-  const row = await db.query.adMetaTotals.findFirst({
-    where: eq(adMetaTotals.id, "current"),
-  });
-  if (!row) return null;
-  return {
-    spend: row.spend,
-    leads: row.leads,
-    impressions: row.impressions,
-    linkClicks: row.linkClicks,
-    capturedAt: row.capturedAt,
-  };
+/**
+ * Every per-ad-per-day row, joined up to its ad set/campaign so the
+ * Overview dashboard can filter and aggregate client-side (same pattern
+ * as EditionsExplorer.tsx) as the date range and Campaign/Ad set/Ad
+ * dropdowns change, rather than a fixed lifetime total.
+ */
+export async function getAdDailyMetricRows(): Promise<AdDailyMetricRow[]> {
+  const rows = await db.query.adDailyMetrics.findMany({ with: { ad: true } });
+  return rows.map((r) => ({
+    date: r.date,
+    campaignId: r.ad.campaignId,
+    adSetId: r.ad.adSetId,
+    adId: r.adId,
+    spend: r.spend,
+    leads: r.leads,
+    impressions: r.impressions,
+    linkClicks: r.linkClicks,
+  }));
+}
+
+export interface MappingForLookup {
+  campaignId: string;
+  adSetIds: string[];
+  adIds: string[];
+  segmentIds: string[];
+}
+
+/**
+ * Slimmed-down mapping rows for the Overview dashboard's Beehiiv lookup —
+ * given whichever campaign/ad set/ad the user has selected, find the
+ * mappings that cover that selection and sum their segments' member
+ * counts. Zero mappings exist yet (BUILD_LOG.md), so this honestly
+ * resolves to nothing until the user builds some on the Mapping page.
+ */
+export async function getMappingsForLookup(): Promise<MappingForLookup[]> {
+  const rows = await db.query.adMappings.findMany();
+  return rows.map((m) => ({
+    campaignId: m.campaignId,
+    adSetIds: m.adSetIds,
+    adIds: m.adIds,
+    segmentIds: m.segmentIds,
+  }));
 }
 
 /**

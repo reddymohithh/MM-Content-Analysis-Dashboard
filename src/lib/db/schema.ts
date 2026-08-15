@@ -286,16 +286,27 @@ export const adMappingsRelations = relations(adMappings, ({ one }) => ({
   campaign: one(adCampaigns, { fields: [adMappings.campaignId], references: [adCampaigns.id] }),
 }));
 
-/** Singleton row (id always "current") holding account-wide Meta totals —
- * spend/leads/impressions/link clicks, lifetime (date_preset=maximum) —
- * refreshed by the same navbar "Refresh" button as everything else in
- * this feature area. Separate from adCampaigns because these are
- * time-range-dependent Insights metrics, not static entity attributes. */
-export const adMetaTotals = pgTable("ad_meta_totals", {
-  id: text("id").primaryKey(),
+/**
+ * Per-ad, per-day Meta metrics — replaces the earlier singleton
+ * "lifetime totals" row (Round 40) now that the Overview page's numbers
+ * need to react to a date range and to campaign/ad set/ad selection
+ * rather than show one fixed account-wide figure. Rolled up to ad set
+ * and campaign level at query time by joining through metaAds/adSets,
+ * not duplicated at every level.
+ */
+export const adDailyMetrics = pgTable("ad_daily_metrics", {
+  id: text("id").primaryKey(), // `${adId}:${date}`
+  adId: text("ad_id")
+    .notNull()
+    .references(() => metaAds.id, { onDelete: "cascade" }),
+  date: text("date").notNull(), // YYYY-MM-DD
   spend: doublePrecision("spend").notNull(),
   leads: integer("leads").notNull(),
   impressions: integer("impressions").notNull(),
   linkClicks: integer("link_clicks").notNull(),
-  capturedAt: timestamp("captured_at", { withTimezone: true }).notNull().defaultNow(),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const adDailyMetricsRelations = relations(adDailyMetrics, ({ one }) => ({
+  ad: one(metaAds, { fields: [adDailyMetrics.adId], references: [metaAds.id] }),
+}));

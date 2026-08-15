@@ -2326,3 +2326,103 @@ caveat text. Filters bar confirmed down to just Search + Date range.
 Mapping page confirmed no title block. Confirmed zero regression on
 `/overview` (content dashboard). `npx tsc --noEmit`, `eslint`, and
 `next build` all clean.
+
+## Round 41: Overview goes fully reactive — real per-day Meta data, Campaign/Ad set/Ad filters, honest Beehiiv-per-selection
+
+Round 40 left the Overview KPIs as one fixed account-wide lifetime
+snapshot. This round's request was explicit: the date range filter has
+to actually change the numbers, "Search campaign" needed to become a
+real dropdown, Ad set and Ad filters needed to exist alongside Campaign,
+the leftover "Ads / Meta Ads spend..." title block had to go, and "Meta
+leads (Ads Manager, lifetime)" had to drop the word "lifetime" since
+that number no longer is one. None of this could be done by filtering
+client-side over a single row — the whole `ad_meta_totals` singleton
+concept from Round 40 had to go.
+
+1. **Schema swap: `ad_meta_totals` (singleton) → `ad_daily_metrics`
+   (per-ad, per-day)**. New table keyed `${adId}:${date}`, rolled up to
+   ad set/campaign at query time by joining through `metaAds`/`adSets`
+   rather than duplicating rows at every level. This hit a real
+   tooling wall: `drizzle-kit generate` needs an interactive prompt to
+   disambiguate "is this a rename or a genuine create+drop" whenever a
+   table is removed and a new one added in the same schema edit, and
+   the sandboxed shell has no real TTY — plain stdin piping and `script`
+   both failed (the latter timed out and had to be killed). Applied the
+   DDL directly against the live DB first to unblock, then went back
+   and actually resolved drizzle's own tracking properly with `expect`
+   driving the real prompt (selecting "create table" for
+   `ad_daily_metrics`, confirming `DROP TABLE ad_meta_totals CASCADE`),
+   which produced the correct migration
+   (`drizzle/0007_stiff_betty_ross.sql`) and left `drizzle-kit push`
+   reporting a clean, already-applied diff. Worth remembering: `expect`
+   is the way through this sandbox's TTY limitation for any future
+   ambiguous drizzle-kit rename prompt, not raw piping or `script`.
+2. **Real per-ad daily data, not another manual snapshot.** Replaced
+   `getAccountTotals()` in the Meta client with `getAdDailyMetrics()`,
+   hitting `/act_<id>/insights` with `level=ad` and `time_increment=1`
+   (real daily granularity, not a lifetime rollup), parsing leads out of
+   the `actions[]` array the same way as before. Wired into
+   `syncMetaAdsData()` so the "Refresh" button keeps this current once
+   `META_ACCESS_TOKEN` exists. For today, needed real numbers now: the
+   MCP's `ads_get_ad_entities` call over `last_90d` had already been
+   made in Round 39/40's research and its raw output was sitting in the
+   harness's saved tool-result file (337 ad-day rows across the same 27
+   campaigns) — parsed that file directly with a small Python script
+   (cleaning the `₹`/comma-formatted spend strings) instead of
+   re-fetching or hand-transcribing, then one-time-seeded
+   `ad_daily_metrics` with it via the usual `scripts/_*.ts` pattern
+   (337 rows, ₹2,39,171.11 total spend, 398 total leads — script run,
+   then deleted).
+3. **Data layer**: `getMetaTotals()`/`adMetaTotals` removed from
+   `src/lib/ads/data.ts`; added `getAdDailyMetricRows()` (every
+   per-ad-per-day row joined up to its campaign/ad set id, for
+   client-side filtering — same pattern as `EditionsExplorer.tsx`) and
+   `getMappingsForLookup()` (slimmed mapping rows for the Beehiiv
+   lookup). `src/lib/ads/types.ts` shrank to two pure helpers
+   (`costPerLead`, `acquisitionCost`) since the old `AdCampaignRow`/
+   `AdDailyPoint` shapes and their `metaCostPerLead`/
+   `trueAcquisitionCost` wrappers no longer matched anything real.
+4. **Overview page rebuild** (`AdsDashboard.tsx`): "Search campaign"
+   became a `MultiSelectDropdown` (reused from the Mapping page, Round
+   38), with two more cascading dropdowns for Ad set and Ad — selecting
+   campaigns narrows the Ad set options to that campaign's ad sets,
+   selecting ad sets narrows Ad options the same way, and deselecting a
+   parent prunes any now-invalid children (same cascade logic as
+   `MappingBuilder.tsx`). Removed the `PageTitle` block entirely. Every
+   number — the 5 KPI cards, the daily spend/leads chart, the "Meta
+   leads vs real Beehiiv subscribers" panel, and a newly real
+   per-campaign breakdown table — now derives via `useMemo` from
+   `ad_daily_metrics` rows filtered by date range + selected
+   campaigns/ad sets/ads, recomputed on every filter change, no
+   round-trip per click. Dropped "lifetime" from the "Meta leads (Ads
+   Manager)" label since the number now moves with the filters.
+5. **Beehiiv stayed honest rather than getting faked into reacting to
+   filters it can't actually see.** Beehiiv segment totals aren't
+   sliced by date or by campaign/ad set/ad — they're whatever a
+   mapping says they are. So: with no Campaign/Ad set/Ad selected, the
+   Beehiiv number falls back to the same "Meta Source (Overall)"
+   aggregate as Round 40. The moment any entity filter is active, it
+   switches to summing the segments from mappings that actually cover
+   the current selection — and since zero mappings exist yet (mapping
+   creation is reserved for the user via the Mapping page UI, never
+   auto-created), it honestly shows "N/A — No mapping covers this
+   selection yet" rather than reusing the aggregate as a stand-in. The
+   per-campaign table applies the same per-row logic, so it's no longer
+   a permanent empty state — it now shows real spend/leads per campaign
+   with an honest N/A wherever no mapping exists for that row.
+
+**Verified in the browser**: loaded `/ads` with no filters and confirmed
+the same real totals as Round 40 (₹2,39,171 spend, 398 leads, ₹601
+cost/lead, 535 Beehiiv subscribers, ₹447 true CAC) now sourced from
+summed daily rows instead of a stored snapshot, with the campaign table
+populated with real per-campaign spend/leads for the first time.
+Selected a single campaign (`TOF_MM_USA_ScalingCampaign_03-08-2026`) and
+confirmed spend/leads/CPL/chart/table all narrowed to that campaign's
+₹18,248/72 leads, Beehiiv correctly flipped to "N/A — No mapping covers
+this selection yet", and the Ad set dropdown cascaded to only that
+campaign's two ad sets. Added a `dateFrom` of 2026-08-10 on top of the
+campaign filter and confirmed spend/leads narrowed further to
+₹9,465/36. Confirmed "Reset filters" clears every filter back to the
+full unfiltered view. Confirmed the Mapping page and `/overview`
+(content dashboard) still render with zero regression. `npx tsc
+--noEmit`, `eslint`, and `next build` all clean.
