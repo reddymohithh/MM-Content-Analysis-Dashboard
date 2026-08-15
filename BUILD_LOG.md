@@ -2642,3 +2642,60 @@ three fields. Ran the full create/verify/delete cycle described above
 against real data. Confirmed `/overview` (content dashboard) and the
 rest of the Ads Overview page still render with zero regression. `npx
 tsc --noEmit`, `eslint`, and `next build` all clean.
+
+## Round 45: walked the whole Overview page's logic with the user, dropped the Beehiiv fallback on the KPI row, confirmed why only one ad-copy variation shows
+
+A review pass, not new feature requests -- the user wanted every box and
+chart on the Ads Overview page confirmed against how it actually works,
+plus one real question about the ad creative modal. One concrete change
+came out of it.
+
+1. **Confirmed, unchanged**: all four filter combinations described
+   (campaign alone, ad set alone with the others empty, ad alone, date
+   range alone with all three entity filters empty) already work exactly
+   as expected -- `filteredMetrics` applies each active filter
+   independently, so any subset holds. "Meta cost / lead (AVG)" is
+   `spend / leads` over whatever's currently filtered. Both charts
+   (Daily spend vs Meta leads, Impressions vs clicks) are confirmed
+   100% Ads-Manager-sourced from `ad_daily_metrics` -- zero Beehiiv
+   involvement, verified by reading `trendPoints`/`impressionsClicksPoints`,
+   both built only from `filteredMetrics`.
+2. **Changed**: the top KPI row's "Beehiiv subscribers" and "True
+   acquisition cost" boxes previously fell back to the account-wide
+   "Meta Source (Overall)" aggregate whenever no Campaign/Ad set/Ad
+   filter was active. Per explicit instruction ("these both we are going
+   to drop... without proper mapping, these both boxes will stay empty
+   for now"), split the old single `beehiivSubscribers` value into
+   `beehiivSubscribersMapped` (strictly mapping-driven, no fallback --
+   feeds both boxes and `trueCac`) and `beehiivSubscribersPanel` (keeps
+   the old fallback behavior, used only by the lower "Meta leads vs real
+   Beehiiv subscribers" comparison panel). The two numbers can now
+   genuinely differ on the same page -- confirmed live: KPI row shows
+   N/A / "No mapping covers this selection yet" while the panel below
+   still shows 548 from the account-wide segment, since the user's own
+   phrasing flagged that panel as intentionally separate from mapping
+   "for now" rather than asking for it to change too.
+3. **Investigated the ad-copy-variations question**, confirmed with a
+   real API call rather than guessing. The account's higher-spend ads
+   use Meta's Dynamic Creative / Advantage+ creative, where multiple
+   text variations live in the creative's `asset_feed_spec.bodies[]`/
+   `titles[]` arrays -- a different field than the single `body`/`title`
+   our sync and the modal currently show. Confirmed the Ads MCP tool
+   used for today's backfill hard-rejects that field
+   (`ads_get_creatives` with `fields: ["asset_feed_spec"]` returned
+   `Unsupported field(s): asset_feed_spec` -- a real, tool-level
+   restriction, not a guess). This is specific to the MCP's allowlist,
+   not a Meta Graph API limitation: our own production client
+   (`src/lib/meta-ads/client.ts`) talks to the real Graph API directly
+   once `META_ACCESS_TOKEN` exists, and `creative{asset_feed_spec{...}}`
+   is a normal, supported field expansion there -- so pulling every
+   variation is buildable, just not through today's manual backfill
+   path. Not built this round; flagged for the user to decide if/how it
+   should surface (e.g. a variation carousel in the existing modal).
+
+**Verified in the browser**: confirmed the KPI row's Beehiiv
+subscribers/True acquisition cost now read N/A with no mapping active,
+while the lower panel's Beehiiv number (548) is unchanged, on the same
+unfiltered page load -- proving the two are now independent values, not
+a shared duplicate render. Confirmed the Mapping page renders with zero
+regression. `npx tsc --noEmit`, `eslint`, and `next build` all clean.

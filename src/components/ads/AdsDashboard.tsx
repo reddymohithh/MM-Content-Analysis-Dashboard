@@ -191,8 +191,13 @@ export function AdsDashboard({
 
   const hasEntityFilter = campaignIds.size > 0 || adSetIds.size > 0 || adIds.size > 0;
 
-  const beehiivSubscribers = useMemo(() => {
-    if (!hasEntityFilter) return beehiivFallback;
+  /**
+   * KPI row (Beehiiv subscribers / True acquisition cost) is strictly
+   * mapping-driven -- no fallback to the account-wide "Meta Source
+   * (Overall)" aggregate. Stays N/A until a real mapping covers the
+   * current selection, even with no Campaign/Ad set/Ad filter applied.
+   */
+  const beehiivSubscribersMapped = useMemo(() => {
     const matchingSegmentIds = new Set<string>();
     for (const m of mappings) {
       if (campaignIds.size > 0 && !campaignIds.has(m.campaignId)) continue;
@@ -200,16 +205,15 @@ export function AdsDashboard({
       if (adIds.size > 0 && !m.adIds.some((id) => adIds.has(id))) continue;
       m.segmentIds.forEach((id) => matchingSegmentIds.add(id));
     }
-    if (matchingSegmentIds.size === 0) return null;
-    let sum = 0;
-    matchingSegmentIds.forEach((id) => {
-      sum += segmentTotalsById.get(id) ?? 0;
-    });
-    return sum;
-  }, [hasEntityFilter, beehiivFallback, mappings, campaignIds, adSetIds, adIds, segmentTotalsById]);
+    return segmentSum(matchingSegmentIds, segmentTotalsById);
+  }, [mappings, campaignIds, adSetIds, adIds, segmentTotalsById]);
+
+  /** "Meta leads vs real Beehiiv subscribers" panel keeps the older,
+   * coarser account-wide comparison for now, independent of mapping. */
+  const beehiivSubscribersPanel = hasEntityFilter ? beehiivSubscribersMapped : beehiivFallback;
 
   const cpl = costPerLead(totals.spend, totals.leads);
-  const trueCac = acquisitionCost(totals.spend, beehiivSubscribers);
+  const trueCac = acquisitionCost(totals.spend, beehiivSubscribersMapped);
 
   const trendPoints = useMemo(() => {
     const byDate = new Map<string, { spend: number; leads: number }>();
@@ -416,14 +420,8 @@ export function AdsDashboard({
         <StatCard label="Meta cost / lead (AVG)" value={cpl !== null ? money(cpl) : "N/A"} />
         <StatCard
           label="Beehiiv subscribers"
-          value={beehiivSubscribers !== null ? beehiivSubscribers.toLocaleString() : "N/A"}
-          sub={
-            beehiivSubscribers === null
-              ? hasEntityFilter
-                ? "No mapping covers this selection yet"
-                : "No Meta-source segment cached yet"
-              : undefined
-          }
+          value={beehiivSubscribersMapped !== null ? beehiivSubscribersMapped.toLocaleString() : "N/A"}
+          sub={beehiivSubscribersMapped === null ? "No mapping covers this selection yet" : undefined}
         />
         <GradientStatCard
           label="True acquisition cost"
@@ -469,7 +467,7 @@ export function AdsDashboard({
               Beehiiv subscribers (source: Meta)
             </div>
             <div className="mt-2 font-serif text-[34px] font-bold text-orange">
-              {beehiivSubscribers !== null ? beehiivSubscribers.toLocaleString() : "N/A"}
+              {beehiivSubscribersPanel !== null ? beehiivSubscribersPanel.toLocaleString() : "N/A"}
             </div>
           </div>
         </div>
