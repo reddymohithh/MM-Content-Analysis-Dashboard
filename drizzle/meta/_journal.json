@@ -64,6 +64,27 @@
       "when": 1786779804373,
       "tag": "0008_nervous_lucky_pierre",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786793146965,
+      "tag": "0009_dark_skaar",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786893093663,
+      "tag": "0010_keen_rockslide",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786894676708,
+      "tag": "0011_simple_scorpion",
+      "breakpoints": true
     }
   ]
 }

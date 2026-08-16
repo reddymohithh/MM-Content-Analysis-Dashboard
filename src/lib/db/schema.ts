@@ -213,6 +213,15 @@ export const adSets = pgTable("ad_sets", {
   status: text("status").notNull(),
   createdTime: timestamp("created_time", { withTimezone: true }).notNull(),
   syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+  /**
+   * "advantage" or "manual" (BUILD_LOG.md Round 49) -- derived from
+   * whether the ad set's real `targeting.publisher_platforms` is set.
+   * Meta omits that key entirely for Advantage+/Automatic placements
+   * (only the broader `effective_publisher_platforms` is present) and
+   * includes it when placements are manually restricted -- confirmed
+   * live against the real account, not guessed. Null until synced.
+   */
+  placementStrategy: text("placement_strategy"),
 });
 
 /** Named metaAds, not ads, to avoid colliding with the generic "ads"
@@ -313,9 +322,45 @@ export const adDailyMetrics = pgTable("ad_daily_metrics", {
   leads: integer("leads").notNull(),
   impressions: integer("impressions").notNull(),
   linkClicks: integer("link_clicks").notNull(),
+  /** Meta's own single-day frequency for this ad (Round 49) -- CPM/CPC
+   * aren't stored since they're cleanly derivable from spend/impressions/
+   * linkClicks already above, but frequency = impressions/reach can't be
+   * derived from anything else here, so it's fetched as its own field.
+   * Aggregating across a multi-day window uses an impressions-weighted
+   * average of these daily values, not a true deduplicated reach for the
+   * window (Meta doesn't expose that from cached per-day data) -- a
+   * standard, honestly-labeled approximation, not treated as exact. */
+  frequency: doublePrecision("frequency").notNull(),
   syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const adDailyMetricsRelations = relations(adDailyMetrics, ({ one }) => ({
   ad: one(metaAds, { fields: [adDailyMetrics.adId], references: [metaAds.id] }),
+}));
+
+/**
+ * Per-ad, per-day, per-platform Meta metrics (Round 49) -- a separate
+ * table from adDailyMetrics rather than adding a nullable platform
+ * column there, since this is a genuinely different granularity (one
+ * ad-day now has N rows, one per publisher_platform Meta actually
+ * delivered on) that most of the app doesn't need and shouldn't have to
+ * filter around. Powers the Platform breakdown view (Facebook vs
+ * Instagram vs Threads vs Audience Network).
+ */
+export const adDailyPlatformMetrics = pgTable("ad_daily_platform_metrics", {
+  id: text("id").primaryKey(), // `${adId}:${date}:${platform}`
+  adId: text("ad_id")
+    .notNull()
+    .references(() => metaAds.id, { onDelete: "cascade" }),
+  date: text("date").notNull(), // YYYY-MM-DD
+  platform: text("platform").notNull(), // Meta's publisher_platform value, e.g. "facebook"
+  spend: doublePrecision("spend").notNull(),
+  leads: integer("leads").notNull(),
+  impressions: integer("impressions").notNull(),
+  linkClicks: integer("link_clicks").notNull(),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const adDailyPlatformMetricsRelations = relations(adDailyPlatformMetrics, ({ one }) => ({
+  ad: one(metaAds, { fields: [adDailyPlatformMetrics.adId], references: [metaAds.id] }),
 }));

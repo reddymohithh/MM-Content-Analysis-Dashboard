@@ -1,0 +1,1 @@
+DROP TABLE "beehiiv_meta_source_daily_counts" CASCADE;

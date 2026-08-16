@@ -2773,3 +2773,121 @@ screenshot ("Trending Skills in 2026") and confirmed the modal now
 renders its real creative image and copy instead of the empty state.
 `npx tsc --noEmit`, `eslint`, and `next build` all clean (no source
 files changed this round).
+
+## Round 48: tried to make "Beehiiv subscribers (source: Meta)" date-aware, hit a real API limitation, reverted cleanly
+
+User asked for the "Meta leads vs real Beehiiv subscribers" panel's
+Beehiiv number to react to the date range the same way Meta's side
+already does -- "in the last 28 days, how many came with Meta as the
+source." A real, worthwhile ask; turned out not to be buildable against
+the public Beehiiv API for this account, discovered by testing live
+rather than assuming.
+
+1. **Confirmed real capability first.** Beehiiv's `list_subscriptions`
+   MCP tool supports `segment_id` + `subscribed_after`/
+   `subscribed_before` and returned a plausible filtered result, so
+   built against it: a real REST client function (`listSubscriptions`),
+   a new `beehiiv_meta_source_daily_counts` cache table (date + count
+   only, no PII), a sync function walking the real subscriptions
+   endpoint, and wired the Overview panel to read from it.
+2. **The sync itself immediately proved the premise wrong.** Walking
+   the real endpoint (not the MCP wrapper) hit a 429 rate limit within
+   a few requests, so this got rearchitected as a proper "sync once on
+   Refresh, read from cache" pattern (matching every other data source
+   in this app) with retry/backoff for 429s and a transient 503 that
+   also showed up. That got the sync running -- but the result was 174,288
+   rows spanning back to 2023-09-11, when the segment in question has
+   ~548 real members starting mid-2026. Investigated directly: passing
+   a completely nonexistent, made-up `segment_id` returned the exact
+   same data as no filter at all, and `subscribed_after`/
+   `subscribed_before` had zero effect either, filtered or not. The
+   real endpoint silently ignores all three params for this account --
+   confirmed with deliberate negative tests, not inferred from one
+   ambiguous result. The MCP tool's convenience wrapper apparently
+   applies filtering itself (or hits a different internal endpoint)
+   that the public REST API this app has to use does not.
+3. **Reverted cleanly rather than shipping the broken result.** Cleared
+   the bad 174K-row data immediately on discovery (never let it render).
+   Removed `listSubscriptions`/`syncBeehiivMetaSourceDailyCounts`/
+   `beehiiv_meta_source_daily_counts` entirely rather than leaving
+   known-broken infrastructure in the codebase, dropped the table, and
+   restored `getBeehiivMetaSourceTotal()` -- the original, honest,
+   working lifetime-total approach from Round 40 -- as what the panel
+   uses. Documented the real limitation in code comments so this isn't
+   re-attempted the same way later. A live per-subscriber UTM-based
+   classification (walking the full subscriber base and guessing "Meta
+   source" from `utm_source`/`utm_medium` directly) remains a real,
+   larger option if ever revisited, but wasn't pursued given the size
+   and the risk of disagreeing with Beehiiv's own segment definition.
+
+**Verified in the browser**: confirmed the panel is back to showing the
+real lifetime total (548) instead of the misleading 0 the abandoned
+attempt left behind, and that dropping the table left `drizzle-kit
+push` reporting a clean, already-applied diff. `npx tsc --noEmit`,
+`eslint`, and `next build` all clean.
+
+## Round 49: Frequency/CPM/CPC, platform breakdown, and Advantage+/manual placement flag
+
+The user relayed a real conversation with their performance marketer
+about what actually goes into a pause/scale decision -- CTR, frequency,
+CPM, CPC, platform-level cost differences, and whether Advantage+
+placements correlate with unstable Beehiiv open rate -- and pointed out
+the dashboard didn't cover most of it. Agreed on a three-phase build
+(a fourth phase, landing-page conversion rate once real mappings exist,
+deferred by the user's own call). Verified every new field/breakdown
+against the real Meta API before writing any code, the same way prior
+rounds verified Beehiiv and creative fields.
+
+1. **Frequency, CPM, CPC.** `frequency` is a real, standard Meta field
+   (confirmed via `ads_get_field_context`) fetched per ad per day
+   alongside spend/leads/impressions/clicks; CPM and CPC aren't stored
+   at all since they're cleanly derivable from spend/impressions/
+   linkClicks already in hand, same as CTR always was. Aggregating
+   frequency across a multi-day window uses an impressions-weighted
+   average of Meta's own daily values, documented honestly as an
+   approximation (true deduplicated reach for an arbitrary window isn't
+   recoverable from cached per-day data -- summing daily reach would
+   overcount overlapping visitors across days). Added a second KPI row
+   and matching columns on the Campaign/Ad set/Ads breakdown table.
+2. **Platform breakdown.** Confirmed live that `publisher_platform` is
+   a real, valid Insights breakdown (not a plain field) and pulled a
+   real per-platform split (Facebook/Instagram/Audience Network/
+   Threads/WhatsApp) with spend/frequency/CPM/CPC per campaign. New
+   `ad_daily_platform_metrics` table (a genuinely different grain --
+   multiple rows per ad-day, one per platform actually delivered on --
+   kept separate from `ad_daily_metrics` rather than adding a nullable
+   platform column there) and a new "Platform breakdown" card, same
+   filters and date range as the rest of the page.
+3. **Advantage+ vs manual placement flag.** Confirmed live, by
+   comparing real ad sets side by side, that Meta's `targeting` field
+   simply omits `publisher_platforms` entirely when placements are
+   Advantage+/Automatic, and includes it as an explicit array when
+   manually restricted -- a clean, reliable signal with no guessing
+   involved. Added `placement_strategy` to `ad_sets`
+   (`targeting{publisher_platforms}` field-expansion on the existing
+   ad sets sync, same pattern as the creative field expansion from
+   Round 43), and a small "Advantage+" / "Manual placements" badge on
+   each row of the Ad set breakdown table.
+4. **Backfilled real historical data for local verification**, same
+   MCP-research-then-bridge-script pattern as every prior real-data
+   round: frequency for the existing 337 `ad_daily_metrics` rows (337
+   matched), a 28-day platform-level dataset (459 rows across 5
+   platforms), and placement strategy for all 38 locally-synced ad sets
+   (85 manual / 15 Advantage+ across the fetched sample). Two of the
+   three MCP responses exceeded the inline token limit and were saved
+   to files by the harness; copied them into the scratchpad and parsed
+   with `json.load`/`python3` rather than re-requesting smaller pages,
+   consistent with how oversized responses have been handled in every
+   prior round. All three one-off bridge scripts deleted after running.
+
+**Verified in the browser**: confirmed real, plausible numbers that
+line up with the marketer's own account of the numbers -- Frequency
+1.11 (within his stated "1 to 1.4" healthy range), CPM ₹4,167.21
+(matching his "~₹4000" observation), and the platform table showing
+Facebook cheaper per lead than Instagram, the same relative ordering he
+described. Confirmed the "Advantage+" badge renders on
+`USA_Audience_Fieldof Study` -- the exact ad set the marketer described
+scaling, watching CPS spike, and pausing. Confirmed the Mapping page's
+existing real mapping was untouched throughout, and `/overview`
+(content dashboard) renders with zero regression. `npx tsc --noEmit`,
+`eslint`, and `next build` all clean.

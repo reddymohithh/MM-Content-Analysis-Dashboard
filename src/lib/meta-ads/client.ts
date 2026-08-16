@@ -76,6 +76,19 @@ export interface MetaAdSet {
   status: string;
   campaign_id: string;
   created_time: string;
+  /** Present only when placements are manually restricted; Meta omits
+   * this key entirely for Advantage+/Automatic placements (confirmed
+   * live, BUILD_LOG.md Round 49). */
+  targeting?: { publisher_platforms?: string[] };
+}
+
+/** "advantage" when Meta is choosing placements automatically (no
+ * `publisher_platforms` in targeting), "manual" when the ad set
+ * restricts to specific platforms. */
+export function placementStrategyOf(adSet: MetaAdSet): "advantage" | "manual" {
+  return adSet.targeting?.publisher_platforms && adSet.targeting.publisher_platforms.length > 0
+    ? "manual"
+    : "advantage";
 }
 
 export interface MetaAdCreative {
@@ -109,7 +122,7 @@ export async function listCampaigns(): Promise<MetaCampaign[]> {
 
 export async function listAdSets(): Promise<MetaAdSet[]> {
   return metaFetchAll<MetaAdSet>(`/act_${adAccountId()}/adsets`, {
-    fields: "id,name,status,campaign_id,created_time",
+    fields: "id,name,status,campaign_id,created_time,targeting{publisher_platforms}",
   });
 }
 
@@ -133,6 +146,7 @@ export interface MetaAdDailyMetric {
   leads: number;
   impressions: number;
   linkClicks: number;
+  frequency: number;
 }
 
 interface InsightsRow {
@@ -141,7 +155,9 @@ interface InsightsRow {
   spend?: string;
   impressions?: string;
   inline_link_clicks?: string;
+  frequency?: string;
   actions?: { action_type: string; value: string }[];
+  publisher_platform?: string;
 }
 
 /**
@@ -151,12 +167,15 @@ interface InsightsRow {
  * (BUILD_LOG.md Round 41). Same `actions` array parsing as before —
  * `lead` isn't a queryable field on the raw Insights endpoint, only an
  * MCP convenience, so it's picked out of `actions` by action_type.
+ * `frequency` is Meta's own single-day figure (Round 49) — CPM/CPC
+ * aren't fetched here since they're cleanly derivable from spend/
+ * impressions/linkClicks already returned.
  */
 export async function getAdDailyMetrics(datePreset = "last_90d"): Promise<MetaAdDailyMetric[]> {
   const rows = await metaFetchAll<InsightsRow>(`/act_${adAccountId()}/insights`, {
     level: "ad",
     time_increment: 1,
-    fields: "ad_id,spend,impressions,inline_link_clicks,actions",
+    fields: "ad_id,spend,impressions,inline_link_clicks,frequency,actions",
     date_preset: datePreset,
   });
   return rows
@@ -166,6 +185,52 @@ export async function getAdDailyMetrics(datePreset = "last_90d"): Promise<MetaAd
       return {
         adId: row.ad_id as string,
         date: row.date_start as string,
+        spend: row.spend ? parseFloat(row.spend) : 0,
+        leads: leadAction ? parseInt(leadAction.value, 10) : 0,
+        impressions: row.impressions ? parseInt(row.impressions, 10) : 0,
+        linkClicks: row.inline_link_clicks ? parseInt(row.inline_link_clicks, 10) : 0,
+        frequency: row.frequency ? parseFloat(row.frequency) : 0,
+      };
+    });
+}
+
+export interface MetaAdDailyPlatformMetric {
+  adId: string;
+  date: string; // YYYY-MM-DD
+  platform: string; // Meta's publisher_platform value, e.g. "facebook"
+  spend: number;
+  leads: number;
+  impressions: number;
+  linkClicks: number;
+}
+
+/**
+ * Same per-ad-per-day insights call as getAdDailyMetrics(), but broken
+ * down by `publisher_platform` (Round 49) -- Facebook vs Instagram vs
+ * Threads vs Audience Network vs Messenger. A genuinely different,
+ * finer-grained result shape (multiple rows per ad-day, one per
+ * platform actually delivered on), which is why this is a separate
+ * call and a separate table rather than folded into
+ * getAdDailyMetrics().
+ */
+export async function getAdDailyPlatformMetrics(
+  datePreset = "last_90d",
+): Promise<MetaAdDailyPlatformMetric[]> {
+  const rows = await metaFetchAll<InsightsRow>(`/act_${adAccountId()}/insights`, {
+    level: "ad",
+    time_increment: 1,
+    fields: "ad_id,spend,impressions,inline_link_clicks,actions",
+    breakdowns: "publisher_platform",
+    date_preset: datePreset,
+  });
+  return rows
+    .filter((row) => row.ad_id && row.date_start && row.publisher_platform)
+    .map((row) => {
+      const leadAction = row.actions?.find((a) => a.action_type === "lead");
+      return {
+        adId: row.ad_id as string,
+        date: row.date_start as string,
+        platform: row.publisher_platform as string,
         spend: row.spend ? parseFloat(row.spend) : 0,
         leads: leadAction ? parseInt(leadAction.value, 10) : 0,
         impressions: row.impressions ? parseInt(row.impressions, 10) : 0,

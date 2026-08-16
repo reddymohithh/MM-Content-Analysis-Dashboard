@@ -4,22 +4,31 @@
  * pattern as src/lib/beehiiv/sync.ts.
  */
 import { db } from "@/lib/db";
-import { adCampaigns, adSets, metaAds, adDailyMetrics } from "@/lib/db/schema";
-import { listCampaigns, listAdSets, listAds, getAdDailyMetrics } from "./client";
+import { adCampaigns, adSets, metaAds, adDailyMetrics, adDailyPlatformMetrics } from "@/lib/db/schema";
+import {
+  listCampaigns,
+  listAdSets,
+  listAds,
+  getAdDailyMetrics,
+  getAdDailyPlatformMetrics,
+  placementStrategyOf,
+} from "./client";
 
 export interface MetaAdsSyncResult {
   campaigns: number;
   adSets: number;
   ads: number;
   dailyMetrics: number;
+  dailyPlatformMetrics: number;
 }
 
 export async function syncMetaAdsData(): Promise<MetaAdsSyncResult> {
-  const [campaigns, sets, ads, daily] = await Promise.all([
+  const [campaigns, sets, ads, daily, dailyPlatform] = await Promise.all([
     listCampaigns(),
     listAdSets(),
     listAds(),
     getAdDailyMetrics(),
+    getAdDailyPlatformMetrics(),
   ]);
 
   for (const c of campaigns) {
@@ -44,6 +53,7 @@ export async function syncMetaAdsData(): Promise<MetaAdsSyncResult> {
   }
 
   for (const s of sets) {
+    const placementStrategy = placementStrategyOf(s);
     await db
       .insert(adSets)
       .values({
@@ -52,10 +62,11 @@ export async function syncMetaAdsData(): Promise<MetaAdsSyncResult> {
         name: s.name,
         status: s.status,
         createdTime: new Date(s.created_time),
+        placementStrategy,
       })
       .onConflictDoUpdate({
         target: adSets.id,
-        set: { name: s.name, status: s.status, syncedAt: new Date() },
+        set: { name: s.name, status: s.status, placementStrategy, syncedAt: new Date() },
       });
   }
 
@@ -98,9 +109,37 @@ export async function syncMetaAdsData(): Promise<MetaAdsSyncResult> {
         leads: d.leads,
         impressions: d.impressions,
         linkClicks: d.linkClicks,
+        frequency: d.frequency,
       })
       .onConflictDoUpdate({
         target: adDailyMetrics.id,
+        set: {
+          spend: d.spend,
+          leads: d.leads,
+          impressions: d.impressions,
+          linkClicks: d.linkClicks,
+          frequency: d.frequency,
+          syncedAt: new Date(),
+        },
+      });
+  }
+
+  for (const d of dailyPlatform) {
+    if (!validAdIds.has(d.adId)) continue;
+    await db
+      .insert(adDailyPlatformMetrics)
+      .values({
+        id: `${d.adId}:${d.date}:${d.platform}`,
+        adId: d.adId,
+        date: d.date,
+        platform: d.platform,
+        spend: d.spend,
+        leads: d.leads,
+        impressions: d.impressions,
+        linkClicks: d.linkClicks,
+      })
+      .onConflictDoUpdate({
+        target: adDailyPlatformMetrics.id,
         set: {
           spend: d.spend,
           leads: d.leads,
@@ -111,5 +150,11 @@ export async function syncMetaAdsData(): Promise<MetaAdsSyncResult> {
       });
   }
 
-  return { campaigns: campaigns.length, adSets: sets.length, ads: ads.length, dailyMetrics: daily.length };
+  return {
+    campaigns: campaigns.length,
+    adSets: sets.length,
+    ads: ads.length,
+    dailyMetrics: daily.length,
+    dailyPlatformMetrics: dailyPlatform.length,
+  };
 }

@@ -18,7 +18,7 @@ export interface CampaignWithChildren {
   status: string;
   objective: string | null;
   createdTime: Date;
-  adSets: { id: string; name: string; status: string }[];
+  adSets: { id: string; name: string; status: string; placementStrategy: string | null }[];
   ads: { id: string; adSetId: string; name: string; status: string; creative: AdCreative }[];
 }
 
@@ -33,7 +33,12 @@ export async function getCampaignsWithChildren(): Promise<CampaignWithChildren[]
     status: c.status,
     objective: c.objective,
     createdTime: c.createdTime,
-    adSets: c.adSets.map((s) => ({ id: s.id, name: s.name, status: s.status })),
+    adSets: c.adSets.map((s) => ({
+      id: s.id,
+      name: s.name,
+      status: s.status,
+      placementStrategy: s.placementStrategy,
+    })),
     ads: c.ads.map((a) => ({
       id: a.id,
       adSetId: a.adSetId,
@@ -124,6 +129,7 @@ export interface AdDailyMetricRow {
   leads: number;
   impressions: number;
   linkClicks: number;
+  frequency: number;
 }
 
 /**
@@ -139,6 +145,39 @@ export async function getAdDailyMetricRows(): Promise<AdDailyMetricRow[]> {
     campaignId: r.ad.campaignId,
     adSetId: r.ad.adSetId,
     adId: r.adId,
+    spend: r.spend,
+    leads: r.leads,
+    impressions: r.impressions,
+    linkClicks: r.linkClicks,
+    frequency: r.frequency,
+  }));
+}
+
+export interface AdDailyPlatformMetricRow {
+  date: string; // YYYY-MM-DD
+  campaignId: string;
+  adSetId: string;
+  adId: string;
+  platform: string;
+  spend: number;
+  leads: number;
+  impressions: number;
+  linkClicks: number;
+}
+
+/**
+ * Same shape as getAdDailyMetricRows() but split by Meta's
+ * publisher_platform (Round 49) -- powers the Platform breakdown view
+ * (Facebook vs Instagram vs Threads vs Audience Network).
+ */
+export async function getAdDailyPlatformMetricRows(): Promise<AdDailyPlatformMetricRow[]> {
+  const rows = await db.query.adDailyPlatformMetrics.findMany({ with: { ad: true } });
+  return rows.map((r) => ({
+    date: r.date,
+    campaignId: r.ad.campaignId,
+    adSetId: r.ad.adSetId,
+    adId: r.adId,
+    platform: r.platform,
     spend: r.spend,
     leads: r.leads,
     impressions: r.impressions,
@@ -172,13 +211,16 @@ export async function getMappingsForLookup(): Promise<MappingForLookup[]> {
 
 /**
  * Beehiiv doesn't expose a segment's filter definition via the public
- * API (confirmed live, BUILD_LOG.md Round 40) — so "the segment that
- * tracks all Meta-sourced subscribers" can only be identified by the
- * naming convention already in use for it ("Meta Source ... (Overall)"),
- * not by inspecting its actual utm_source filter. Picks the largest such
- * segment (the broadest/most inclusive date window) rather than summing
- * every match, since narrower "Meta Source - <month>" segments are
- * subsets of the combined one, not additional subscribers.
+ * API (confirmed live, BUILD_LOG.md Round 40), and its real
+ * subscriptions endpoint doesn't honor date-range or segment filters
+ * either (confirmed live, Round 48) -- so a date-sliced Meta-source
+ * subscriber count isn't obtainable, and "the segment that tracks all
+ * Meta-sourced subscribers" can only be identified by the naming
+ * convention already in use for it ("Meta Source ... (Overall)"), not
+ * by inspecting its actual filter. Picks the largest such segment (the
+ * broadest/most inclusive date window) rather than summing every
+ * match, since narrower "Meta Source - <month>" segments are subsets
+ * of the combined one, not additional subscribers.
  */
 export async function getBeehiivMetaSourceTotal(): Promise<number | null> {
   const rows = await db.query.beehiivSegmentsCache.findMany();

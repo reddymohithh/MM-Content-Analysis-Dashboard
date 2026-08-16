@@ -57,7 +57,11 @@ async function beehiivFetch<T>(
   const res = await fetch(url, { headers: authHeaders() });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`Beehiiv API error ${res.status} on ${path}: ${body}`);
+    const err = new Error(`Beehiiv API error ${res.status} on ${path}: ${body}`) as Error & {
+      status?: number;
+    };
+    err.status = res.status;
+    throw err;
   }
   return res.json() as Promise<T>;
 }
@@ -393,6 +397,18 @@ export async function listSegments(publicationId: string) {
     expand: ["stats"],
   });
 }
+
+/**
+ * NOT built, on purpose (BUILD_LOG.md Round 48): the real
+ * `/publications/:id/subscriptions` endpoint silently ignores both
+ * `segment_id` and `subscribed_after`/`subscribed_before` for this
+ * account -- confirmed live by passing a nonexistent segment id and
+ * getting the exact same results back as no filter at all. A per-day,
+ * per-source Beehiiv subscriber count isn't reliably obtainable from
+ * the public API today; the "Meta leads vs real Beehiiv subscribers"
+ * panel uses the segment's own lifetime total instead (see
+ * getBeehiivMetaSourceTotal in src/lib/ads/data.ts).
+ */
 
 // --- Non-editorial link exclusion (see docs/PROJECT_SPEC.md rule 3) --------
 

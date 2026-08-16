@@ -7,14 +7,58 @@ import { ImpressionsClicksChart } from "./ImpressionsClicksChart";
 import { MultiSelectDropdown } from "./MultiSelectDropdown";
 import { AdCreativeModal } from "./AdCreativeModal";
 import { costPerLead, acquisitionCost } from "@/lib/ads/types";
-import type { CampaignWithChildren, AdDailyMetricRow, MappingForLookup, SegmentOption, AdCreative } from "@/lib/ads/data";
+import type {
+  CampaignWithChildren,
+  AdDailyMetricRow,
+  AdDailyPlatformMetricRow,
+  MappingForLookup,
+  SegmentOption,
+  AdCreative,
+} from "@/lib/ads/data";
 
 const dateCls =
   "w-full rounded-lg border border-border bg-card px-2.5 py-1.5 text-[12.5px] text-text-faint outline-none focus:border-orange";
 
 const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
+const money2 = (n: number) => `₹${n.toFixed(2)}`;
 
-type SortKey = "name" | "spend" | "metaLeads" | "metaCpl" | "beehiivSubscribers" | "trueCac";
+/** CPM/CPC are cleanly derivable from spend/impressions/linkClicks, same
+ * as CTR already was — no need to store them separately. */
+function cpmOf(spend: number, impressions: number): number | null {
+  return impressions > 0 ? (spend / impressions) * 1000 : null;
+}
+function cpcOf(spend: number, linkClicks: number): number | null {
+  return linkClicks > 0 ? spend / linkClicks : null;
+}
+/** Impressions-weighted average of Meta's own daily frequency values —
+ * an honest approximation, not a true deduplicated reach for the window
+ * (see schema.ts comment on adDailyMetrics.frequency). */
+function avgFrequency(frequencyImpressionSum: number, impressions: number): number | null {
+  return impressions > 0 ? frequencyImpressionSum / impressions : null;
+}
+
+const PLATFORM_LABELS: Record<string, string> = {
+  facebook: "Facebook",
+  instagram: "Instagram",
+  audience_network: "Audience Network",
+  messenger: "Messenger",
+  threads: "Threads",
+  whatsapp: "WhatsApp",
+};
+function platformLabel(platform: string): string {
+  return PLATFORM_LABELS[platform] ?? platform;
+}
+
+type SortKey =
+  | "name"
+  | "spend"
+  | "metaLeads"
+  | "metaCpl"
+  | "beehiivSubscribers"
+  | "trueCac"
+  | "frequency"
+  | "cpm"
+  | "cpc";
 type BreakdownLevel = "campaign" | "adSet" | "ad";
 
 interface BreakdownRow {
@@ -23,8 +67,12 @@ interface BreakdownRow {
   status?: string;
   spend: number;
   metaLeads: number;
+  impressions: number;
+  linkClicks: number;
+  frequencyImpressionSum: number;
   beehiivSubscribers: number | null;
   creative?: AdCreative;
+  placementStrategy?: string | null;
 }
 
 function sortRows(rows: BreakdownRow[], sortKey: SortKey, sortDir: 1 | -1): BreakdownRow[] {
@@ -49,6 +97,18 @@ function sortRows(rows: BreakdownRow[], sortKey: SortKey, sortDir: 1 | -1): Brea
       case "spend":
         x = a.spend;
         y = b.spend;
+        break;
+      case "frequency":
+        x = avgFrequency(a.frequencyImpressionSum, a.impressions) ?? -1;
+        y = avgFrequency(b.frequencyImpressionSum, b.impressions) ?? -1;
+        break;
+      case "cpm":
+        x = cpmOf(a.spend, a.impressions) ?? Infinity;
+        y = cpmOf(b.spend, b.impressions) ?? Infinity;
+        break;
+      case "cpc":
+        x = cpcOf(a.spend, a.linkClicks) ?? Infinity;
+        y = cpcOf(b.spend, b.linkClicks) ?? Infinity;
         break;
       default:
         x = a.metaLeads;
@@ -91,12 +151,14 @@ function last28Days(): { from: string; to: string } {
 export function AdsDashboard({
   campaigns,
   dailyMetrics,
+  dailyPlatformMetrics,
   mappings,
   segments,
   beehiivFallback,
 }: {
   campaigns: CampaignWithChildren[];
   dailyMetrics: AdDailyMetricRow[];
+  dailyPlatformMetrics: AdDailyPlatformMetricRow[];
   mappings: MappingForLookup[];
   segments: SegmentOption[];
   beehiivFallback: number | null;
@@ -175,6 +237,17 @@ export function AdsDashboard({
     });
   }, [dailyMetrics, dateFrom, dateTo, campaignIds, adSetIds, adIds]);
 
+  const filteredPlatformMetrics = useMemo(() => {
+    return dailyPlatformMetrics.filter((d) => {
+      if (dateFrom && d.date < dateFrom) return false;
+      if (dateTo && d.date > dateTo) return false;
+      if (campaignIds.size > 0 && !campaignIds.has(d.campaignId)) return false;
+      if (adSetIds.size > 0 && !adSetIds.has(d.adSetId)) return false;
+      if (adIds.size > 0 && !adIds.has(d.adId)) return false;
+      return true;
+    });
+  }, [dailyPlatformMetrics, dateFrom, dateTo, campaignIds, adSetIds, adIds]);
+
   const totals = useMemo(() => {
     return filteredMetrics.reduce(
       (acc, d) => ({
@@ -182,14 +255,17 @@ export function AdsDashboard({
         leads: acc.leads + d.leads,
         impressions: acc.impressions + d.impressions,
         linkClicks: acc.linkClicks + d.linkClicks,
+        frequencyImpressionSum: acc.frequencyImpressionSum + d.frequency * d.impressions,
       }),
-      { spend: 0, leads: 0, impressions: 0, linkClicks: 0 },
+      { spend: 0, leads: 0, impressions: 0, linkClicks: 0, frequencyImpressionSum: 0 },
     );
   }, [filteredMetrics]);
 
-  const segmentTotalsById = useMemo(() => new Map(segments.map((s) => [s.id, s.totalResults])), [segments]);
+  const cpmAvg = cpmOf(totals.spend, totals.impressions);
+  const cpcAvg = cpcOf(totals.spend, totals.linkClicks);
+  const frequencyAvg = avgFrequency(totals.frequencyImpressionSum, totals.impressions);
 
-  const hasEntityFilter = campaignIds.size > 0 || adSetIds.size > 0 || adIds.size > 0;
+  const segmentTotalsById = useMemo(() => new Map(segments.map((s) => [s.id, s.totalResults])), [segments]);
 
   /**
    * KPI row (Beehiiv subscribers / True acquisition cost) is strictly
@@ -208,8 +284,13 @@ export function AdsDashboard({
     return segmentSum(matchingSegmentIds, segmentTotalsById);
   }, [mappings, campaignIds, adSetIds, adIds, segmentTotalsById]);
 
-  /** "Meta leads vs real Beehiiv subscribers" panel keeps the older,
-   * coarser account-wide comparison for now, independent of mapping. */
+  const hasEntityFilter = campaignIds.size > 0 || adSetIds.size > 0 || adIds.size > 0;
+
+  /** "Meta leads vs real Beehiiv subscribers" panel keeps the account-wide
+   * "Meta Source (Overall)" segment total -- Beehiiv's real subscriptions
+   * endpoint doesn't honor date-range or segment filters (confirmed live,
+   * BUILD_LOG.md Round 48), so a date-sliced or entity-scoped version of
+   * this number isn't obtainable from the public API today. */
   const beehiivSubscribersPanel = hasEntityFilter ? beehiivSubscribersMapped : beehiivFallback;
 
   const cpl = costPerLead(totals.spend, totals.leads);
@@ -251,11 +332,19 @@ export function AdsDashboard({
   const adInfoById = useMemo(() => new Map(allAds.map((a) => [a.id, a])), [allAds]);
 
   const perCampaignRows = useMemo((): BreakdownRow[] => {
-    const byCampaign = new Map<string, { spend: number; metaLeads: number }>();
+    const byCampaign = new Map<
+      string,
+      { spend: number; metaLeads: number; impressions: number; linkClicks: number; frequencyImpressionSum: number }
+    >();
     for (const d of filteredMetrics) {
-      const cur = byCampaign.get(d.campaignId) ?? { spend: 0, metaLeads: 0 };
+      const cur =
+        byCampaign.get(d.campaignId) ??
+        { spend: 0, metaLeads: 0, impressions: 0, linkClicks: 0, frequencyImpressionSum: 0 };
       cur.spend += d.spend;
       cur.metaLeads += d.leads;
+      cur.impressions += d.impressions;
+      cur.linkClicks += d.linkClicks;
+      cur.frequencyImpressionSum += d.frequency * d.impressions;
       byCampaign.set(d.campaignId, cur);
     }
     return [...byCampaign.entries()].map(([campaignId, agg]) => {
@@ -271,17 +360,28 @@ export function AdsDashboard({
         name: campaignNameById.get(campaignId) ?? "(unknown campaign)",
         spend: agg.spend,
         metaLeads: agg.metaLeads,
+        impressions: agg.impressions,
+        linkClicks: agg.linkClicks,
+        frequencyImpressionSum: agg.frequencyImpressionSum,
         beehiivSubscribers: segmentSum(matchingSegmentIds, segmentTotalsById),
       };
     });
   }, [filteredMetrics, mappings, adSetIds, adIds, segmentTotalsById, campaignNameById]);
 
   const perAdSetRows = useMemo((): BreakdownRow[] => {
-    const byAdSet = new Map<string, { spend: number; metaLeads: number }>();
+    const byAdSet = new Map<
+      string,
+      { spend: number; metaLeads: number; impressions: number; linkClicks: number; frequencyImpressionSum: number }
+    >();
     for (const d of filteredMetrics) {
-      const cur = byAdSet.get(d.adSetId) ?? { spend: 0, metaLeads: 0 };
+      const cur =
+        byAdSet.get(d.adSetId) ??
+        { spend: 0, metaLeads: 0, impressions: 0, linkClicks: 0, frequencyImpressionSum: 0 };
       cur.spend += d.spend;
       cur.metaLeads += d.leads;
+      cur.impressions += d.impressions;
+      cur.linkClicks += d.linkClicks;
+      cur.frequencyImpressionSum += d.frequency * d.impressions;
       byAdSet.set(d.adSetId, cur);
     }
     return [...byAdSet.entries()].map(([adSetId, agg]) => {
@@ -299,17 +399,28 @@ export function AdsDashboard({
         status: info?.status,
         spend: agg.spend,
         metaLeads: agg.metaLeads,
+        impressions: agg.impressions,
+        linkClicks: agg.linkClicks,
+        frequencyImpressionSum: agg.frequencyImpressionSum,
         beehiivSubscribers: segmentSum(matchingSegmentIds, segmentTotalsById),
+        placementStrategy: info?.placementStrategy,
       };
     });
   }, [filteredMetrics, mappings, adIds, segmentTotalsById, adSetInfoById]);
 
   const perAdRows = useMemo((): BreakdownRow[] => {
-    const byAd = new Map<string, { spend: number; metaLeads: number }>();
+    const byAd = new Map<
+      string,
+      { spend: number; metaLeads: number; impressions: number; linkClicks: number; frequencyImpressionSum: number }
+    >();
     for (const d of filteredMetrics) {
-      const cur = byAd.get(d.adId) ?? { spend: 0, metaLeads: 0 };
+      const cur =
+        byAd.get(d.adId) ?? { spend: 0, metaLeads: 0, impressions: 0, linkClicks: 0, frequencyImpressionSum: 0 };
       cur.spend += d.spend;
       cur.metaLeads += d.leads;
+      cur.impressions += d.impressions;
+      cur.linkClicks += d.linkClicks;
+      cur.frequencyImpressionSum += d.frequency * d.impressions;
       byAd.set(d.adId, cur);
     }
     return [...byAd.entries()].map(([adId, agg]) => {
@@ -327,11 +438,32 @@ export function AdsDashboard({
         status: info?.status,
         spend: agg.spend,
         metaLeads: agg.metaLeads,
+        impressions: agg.impressions,
+        linkClicks: agg.linkClicks,
+        frequencyImpressionSum: agg.frequencyImpressionSum,
         beehiivSubscribers: segmentSum(matchingSegmentIds, segmentTotalsById),
         creative: info?.creative,
       };
     });
   }, [filteredMetrics, mappings, segmentTotalsById, adInfoById]);
+
+  const platformRows = useMemo(() => {
+    const byPlatform = new Map<
+      string,
+      { spend: number; leads: number; impressions: number; linkClicks: number }
+    >();
+    for (const d of filteredPlatformMetrics) {
+      const cur = byPlatform.get(d.platform) ?? { spend: 0, leads: 0, impressions: 0, linkClicks: 0 };
+      cur.spend += d.spend;
+      cur.leads += d.leads;
+      cur.impressions += d.impressions;
+      cur.linkClicks += d.linkClicks;
+      byPlatform.set(d.platform, cur);
+    }
+    return [...byPlatform.entries()]
+      .map(([platform, agg]) => ({ platform, ...agg }))
+      .sort((a, b) => b.spend - a.spend);
+  }, [filteredPlatformMetrics]);
 
   const breakdownRowsByLevel: Record<BreakdownLevel, BreakdownRow[]> = {
     campaign: perCampaignRows,
@@ -425,6 +557,16 @@ export function AdsDashboard({
         <GradientStatCard label="True acquisition cost" value={trueCac !== null ? money(trueCac) : "N/A"} />
       </div>
 
+      <div className="mb-4 grid grid-cols-3 gap-3">
+        <StatCard
+          label="Frequency (AVG)"
+          value={frequencyAvg !== null ? frequencyAvg.toFixed(2) : "N/A"}
+          sub="Impressions ÷ reach, weighted by day"
+        />
+        <StatCard label="CPM (AVG)" value={cpmAvg !== null ? money2(cpmAvg) : "N/A"} />
+        <StatCard label="CPC (AVG)" value={cpcAvg !== null ? money2(cpcAvg) : "N/A"} />
+      </div>
+
       <Card className="mb-4">
         <Eyebrow>Daily spend vs Meta leads</Eyebrow>
         <DualSeriesTrendChart
@@ -442,13 +584,69 @@ export function AdsDashboard({
       </Card>
 
       <Card className="mb-4">
+        <Eyebrow>Platform breakdown</Eyebrow>
+        <p className="mb-3 text-[11.5px] text-text-muted">
+          Facebook vs Instagram vs Threads vs Audience Network, same
+          filters and date range as the rest of the page. Meta only
+          reports a platform once it has actually delivered impressions
+          there.
+        </p>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-[12.5px]">
+            <thead>
+              <tr className="bg-card-soft">
+                {["Platform", "Spend", "Leads", "CPM", "CPC", "CTR", "Cost / lead"].map((label) => (
+                  <th
+                    key={label}
+                    className={`px-3.5 py-2.5 font-mono text-[10.5px] uppercase tracking-wide text-text-muted ${
+                      label === "Platform" ? "text-left" : "text-right"
+                    }`}
+                  >
+                    {label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {platformRows.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-3.5 py-8">
+                    <EmptyState>No spend in this window. Try a wider date range or fewer filters.</EmptyState>
+                  </td>
+                </tr>
+              ) : (
+                platformRows.map((row) => {
+                  const rowCpm = cpmOf(row.spend, row.impressions);
+                  const rowCpc = cpcOf(row.spend, row.linkClicks);
+                  const rowCtr = row.impressions > 0 ? (row.linkClicks / row.impressions) * 100 : null;
+                  const rowCpl = costPerLead(row.spend, row.leads);
+                  return (
+                    <tr key={row.platform} className="border-b border-border last:border-0 hover:bg-card-soft">
+                      <td className="px-3.5 py-2.5 font-medium">{platformLabel(row.platform)}</td>
+                      <td className="px-3.5 py-2.5 text-right">{money(row.spend)}</td>
+                      <td className="px-3.5 py-2.5 text-right">{row.leads.toLocaleString()}</td>
+                      <td className="px-3.5 py-2.5 text-right">{rowCpm !== null ? money2(rowCpm) : "N/A"}</td>
+                      <td className="px-3.5 py-2.5 text-right">{rowCpc !== null ? money2(rowCpc) : "N/A"}</td>
+                      <td className="px-3.5 py-2.5 text-right">{rowCtr !== null ? `${rowCtr.toFixed(2)}%` : "N/A"}</td>
+                      <td className="px-3.5 py-2.5 text-right">{rowCpl !== null ? money(rowCpl) : "N/A"}</td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      <Card className="mb-4">
         <Eyebrow>Meta leads vs real Beehiiv subscribers</Eyebrow>
         <p className="mb-3 text-[11.5px] text-text-muted">
           Not everyone Meta counts as a lead becomes a real Beehiiv
           subscriber. Meta&apos;s number here reflects the filters above;
-          Beehiiv&apos;s comes from mapped segments, which aren&apos;t
-          sliced by date, so treat these as two real numbers worth
-          comparing, not a strict before/after of the same cohort.
+          Beehiiv&apos;s comes from the account-wide Meta-source segment,
+          which isn&apos;t sliced by date, so treat these as two real
+          numbers worth comparing, not a strict before/after of the same
+          cohort.
         </p>
         <div className="grid grid-cols-2 gap-4">
           <div className="rounded-lg border border-border bg-card-soft p-5 text-center">
@@ -504,6 +702,9 @@ export function AdsDashboard({
                     ["spend", "Spend"],
                     ["metaLeads", "Meta leads"],
                     ["metaCpl", "Meta CPL"],
+                    ["frequency", "Frequency"],
+                    ["cpm", "CPM"],
+                    ["cpc", "CPC"],
                     ["beehiivSubscribers", "Beehiiv subs"],
                     ["trueCac", "True CAC"],
                   ] as [SortKey, string][]
@@ -524,7 +725,7 @@ export function AdsDashboard({
             <tbody>
               {breakdownRows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-3.5 py-8">
+                  <td colSpan={9} className="px-3.5 py-8">
                     <EmptyState>No spend in this window. Try a wider date range or fewer filters.</EmptyState>
                   </td>
                 </tr>
@@ -532,6 +733,9 @@ export function AdsDashboard({
                 breakdownRows.map((row) => {
                   const rowCpl = costPerLead(row.spend, row.metaLeads);
                   const cac = acquisitionCost(row.spend, row.beehiivSubscribers);
+                  const rowFrequency = avgFrequency(row.frequencyImpressionSum, row.impressions);
+                  const rowCpm = cpmOf(row.spend, row.impressions);
+                  const rowCpc = cpcOf(row.spend, row.linkClicks);
                   const clickable = breakdownLevel === "ad";
                   return (
                     <tr
@@ -543,10 +747,26 @@ export function AdsDashboard({
                     >
                       <td className="px-3.5 py-2.5">
                         <div className="font-medium">{row.name}</div>
+                        {breakdownLevel === "adSet" && row.placementStrategy && (
+                          <div
+                            className={`mt-0.5 inline-block rounded px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wide ${
+                              row.placementStrategy === "advantage"
+                                ? "bg-orange/15 text-orange"
+                                : "bg-card-soft text-text-muted"
+                            }`}
+                          >
+                            {row.placementStrategy === "advantage" ? "Advantage+" : "Manual placements"}
+                          </div>
+                        )}
                       </td>
                       <td className="px-3.5 py-2.5 text-right">{money(row.spend)}</td>
                       <td className="px-3.5 py-2.5 text-right">{row.metaLeads.toLocaleString()}</td>
                       <td className="px-3.5 py-2.5 text-right">{rowCpl !== null ? money(rowCpl) : "N/A"}</td>
+                      <td className="px-3.5 py-2.5 text-right">
+                        {rowFrequency !== null ? rowFrequency.toFixed(2) : "N/A"}
+                      </td>
+                      <td className="px-3.5 py-2.5 text-right">{rowCpm !== null ? money2(rowCpm) : "N/A"}</td>
+                      <td className="px-3.5 py-2.5 text-right">{rowCpc !== null ? money2(rowCpc) : "N/A"}</td>
                       <td className="px-3.5 py-2.5 text-right">
                         {row.beehiivSubscribers !== null ? row.beehiivSubscribers.toLocaleString() : "N/A"}
                       </td>
