@@ -13,6 +13,7 @@ const TABS = [
 
 const ADS_TABS = [
   { href: "/ads", label: "Overview" },
+  { href: "/ads/campaigns", label: "Campaigns" },
   { href: "/ads/mapping", label: "Mapping" },
 ];
 

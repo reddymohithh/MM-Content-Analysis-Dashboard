@@ -2991,3 +2991,67 @@ real location (US), age range, "All" gender, manual placement showing
 Facebook/Instagram/Threads (matching its "Manual placements" badge),
 deduped interest chips, and the honest conversion-location caption.
 `npx tsc --noEmit`, `eslint`, and `next build` all clean.
+
+## Round 51: dropped the root landing screen, added a dedicated Campaigns page
+
+Two requests. First: the root "/" page (the "Marketing Monk" hub with
+two cards linking to Content and Ads) was unnecessary -- login should
+land straight on the Content dashboard. Replaced `src/app/page.tsx`
+with a server-side `redirect("/overview")`, and changed the login
+form's default `next` value from `/` to `/overview` so a direct
+`/login` visit (no `next` query param) also lands there. The proxy
+gate's own redirect-to-login logic already round-trips through
+whatever `next` it was given, so no change needed there.
+
+Second: "create a separate section for campaigns" -- asked which of
+two readings was meant (a new dedicated page vs. reorganizing the
+existing Overview page's filters) rather than guessing, since it's a
+real information-architecture decision. User chose a new page. Before
+building, tested whether the described cascading behavior ("ad sets
+within the campaign only show up in the ad set tab") was already real:
+selecting a campaign in the Overview page's filter dropdown already
+narrowed the Ad set dropdown correctly (confirmed live -- one campaign
+selected, ad set options went from ~40 down to the 2 that actually
+belong to it). That logic (`availableAdSets`/`availableAds` in
+`AdsDashboard.tsx`) was untouched.
+
+Built `/ads/campaigns` (new `CampaignsBrowser.tsx` + a `Campaigns` tab
+in `ADS_TABS`, third position between Overview and Mapping) as a pure
+browse/drill-down view, deliberately separate from the Overview page's
+spend-filtered breakdown table: level 1 lists every campaign, clicking
+one drills into level 2 (its ad sets only), clicking one of those
+drills into level 3 (its ads only) -- each level backed directly by
+the real parent/child relationship in `CampaignWithChildren`, not by
+whether anything had spend in a date window, so an ad set with zero
+recent spend still shows up. A breadcrumb (`All campaigns / <campaign>
+/ <ad set>`) lets you jump back up. Each row also has a "Details"
+button that opens the exact same `CampaignDetailModal`/
+`AdSetDetailModal` built in Round 50 without leaving the list; clicking
+an ad row (a leaf, nothing further to drill into) opens the existing
+`AdCreativeModal` directly, same as the Overview page's ad rows
+already did. No new data-layer code needed -- `getCampaignsWithChildren()`
+already returns everything this page needed.
+
+**Verified in the browser**: confirmed "/" redirects straight to
+`/overview` with no flash of the old landing page. Drilled all the way
+down on `/ads/campaigns` -- selected `TOF_MM_USA_ScalingCampaign_03-08-2026`
+(2 ad sets), then `USA_AI_AdvPlus_Audience` (2 ads), confirmed only
+that ad set's real ads showed up (`Ad1_MM_USA_Gemini_MotionGraphic`,
+`Ad2_MM_USA_SkillsMissing`), clicked one and got the real creative in
+`AdCreativeModal`, and confirmed the "Details" button on the ad set row
+opened the real `AdSetDetailModal` with correct data mid-drill-down.
+Confirmed the breadcrumb correctly jumps back a level. `/ads` (Overview)
+and `/ads/mapping` both still render with zero regression on the new
+3-tab navbar. `npx tsc --noEmit`, `eslint`, and `next build` all clean.
+
+**Separately noticed, not caused by this round**: `/ads/mapping` now
+shows zero mappings, where earlier in this session it had two real
+ones. Checked directly against the database rather than assuming a
+rendering bug -- `ad_campaigns` (27), `ad_sets` (41), `meta_ads` (82),
+`ad_daily_metrics` (337), and `beehiiv_segments_cache` (77) are all
+exactly the same counts as before, only `ad_mappings` is empty. Nothing
+in this round's diff touches that table, and no query against it was
+run this session outside of reads. Since mapping curation is
+explicitly the user's own action via the Mapping page UI (not
+something built or restored on their behalf), left it as-is rather
+than recreating anything, and flagged it directly to the user instead.
