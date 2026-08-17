@@ -12,6 +12,11 @@ import {
   getAdDailyMetrics,
   getAdDailyPlatformMetrics,
   placementStrategyOf,
+  bidStrategyLabel,
+  budgetRupeesOf,
+  genderLabelOf,
+  locationsOf,
+  interestsOf,
 } from "./client";
 
 export interface MetaAdsSyncResult {
@@ -32,6 +37,11 @@ export async function syncMetaAdsData(): Promise<MetaAdsSyncResult> {
   ]);
 
   for (const c of campaigns) {
+    const detail = {
+      bidStrategy: bidStrategyLabel(c.bid_strategy),
+      dailyBudget: budgetRupeesOf(c.daily_budget),
+      lifetimeBudget: budgetRupeesOf(c.lifetime_budget),
+    };
     await db
       .insert(adCampaigns)
       .values({
@@ -40,6 +50,7 @@ export async function syncMetaAdsData(): Promise<MetaAdsSyncResult> {
         status: c.status,
         objective: c.objective ?? null,
         createdTime: new Date(c.created_time),
+        ...detail,
       })
       .onConflictDoUpdate({
         target: adCampaigns.id,
@@ -48,12 +59,25 @@ export async function syncMetaAdsData(): Promise<MetaAdsSyncResult> {
           status: c.status,
           objective: c.objective ?? null,
           syncedAt: new Date(),
+          ...detail,
         },
       });
   }
 
   for (const s of sets) {
     const placementStrategy = placementStrategyOf(s);
+    const detail = {
+      bidStrategy: bidStrategyLabel(s.bid_strategy),
+      dailyBudget: budgetRupeesOf(s.daily_budget),
+      lifetimeBudget: budgetRupeesOf(s.lifetime_budget),
+      optimizationGoal: s.optimization_goal ?? null,
+      ageMin: s.targeting?.age_min ?? null,
+      ageMax: s.targeting?.age_max ?? null,
+      genderLabel: genderLabelOf(s.targeting?.genders),
+      locations: locationsOf(s.targeting?.geo_locations),
+      interests: interestsOf(s.targeting?.flexible_spec),
+      platforms: s.targeting?.publisher_platforms ?? null,
+    };
     await db
       .insert(adSets)
       .values({
@@ -63,10 +87,11 @@ export async function syncMetaAdsData(): Promise<MetaAdsSyncResult> {
         status: s.status,
         createdTime: new Date(s.created_time),
         placementStrategy,
+        ...detail,
       })
       .onConflictDoUpdate({
         target: adSets.id,
-        set: { name: s.name, status: s.status, placementStrategy, syncedAt: new Date() },
+        set: { name: s.name, status: s.status, placementStrategy, syncedAt: new Date(), ...detail },
       });
   }
 

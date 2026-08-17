@@ -202,6 +202,17 @@ export const adCampaigns = pgTable("ad_campaigns", {
   objective: text("objective"),
   createdTime: timestamp("created_time", { withTimezone: true }).notNull(),
   syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+  /**
+   * Budget-strategy fields (BUILD_LOG.md Round 50), shown in the Campaign
+   * detail modal. `dailyBudget`/`lifetimeBudget` are in rupees, only one of
+   * which is ever set. When BOTH are null at the campaign level, the
+   * campaign uses Ad Set Budget Optimization (each ad set sets its own
+   * budget) rather than Campaign Budget Optimization -- the UI derives that
+   * distinction from presence/absence rather than a separate stored flag.
+   */
+  bidStrategy: text("bid_strategy"),
+  dailyBudget: doublePrecision("daily_budget"),
+  lifetimeBudget: doublePrecision("lifetime_budget"),
 });
 
 export const adSets = pgTable("ad_sets", {
@@ -222,6 +233,24 @@ export const adSets = pgTable("ad_sets", {
    * live against the real account, not guessed. Null until synced.
    */
   placementStrategy: text("placement_strategy"),
+  /**
+   * Ad set detail fields (BUILD_LOG.md Round 50), shown in the Ad set
+   * detail modal. `dailyBudget`/`lifetimeBudget` are rupees, only set when
+   * this ad set (not its campaign) owns the budget. `platforms` is the
+   * real chosen platform list from `targeting.publisher_platforms`, only
+   * present for manual (non-Advantage+) placement -- null for Advantage+
+   * ad sets, where `placementStrategy` above already says so.
+   */
+  bidStrategy: text("bid_strategy"),
+  dailyBudget: doublePrecision("daily_budget"),
+  lifetimeBudget: doublePrecision("lifetime_budget"),
+  optimizationGoal: text("optimization_goal"),
+  ageMin: integer("age_min"),
+  ageMax: integer("age_max"),
+  genderLabel: text("gender_label"),
+  locations: jsonb("locations").$type<string[]>(),
+  interests: jsonb("interests").$type<{ category: string; name: string }[]>(),
+  platforms: jsonb("platforms").$type<string[]>(),
 });
 
 /** Named metaAds, not ads, to avoid colliding with the generic "ads"

@@ -12,13 +12,33 @@ export interface AdCreative {
   callToAction: string | null;
 }
 
+export interface CampaignDetail {
+  bidStrategy: string | null;
+  dailyBudget: number | null;
+  lifetimeBudget: number | null;
+}
+
+export interface AdSetDetail {
+  bidStrategy: string | null;
+  dailyBudget: number | null;
+  lifetimeBudget: number | null;
+  optimizationGoal: string | null;
+  ageMin: number | null;
+  ageMax: number | null;
+  genderLabel: string | null;
+  locations: string[] | null;
+  interests: { category: string; name: string }[] | null;
+  platforms: string[] | null;
+}
+
 export interface CampaignWithChildren {
   id: string;
   name: string;
   status: string;
   objective: string | null;
   createdTime: Date;
-  adSets: { id: string; name: string; status: string; placementStrategy: string | null }[];
+  detail: CampaignDetail;
+  adSets: { id: string; name: string; status: string; placementStrategy: string | null; detail: AdSetDetail }[];
   ads: { id: string; adSetId: string; name: string; status: string; creative: AdCreative }[];
 }
 
@@ -33,11 +53,28 @@ export async function getCampaignsWithChildren(): Promise<CampaignWithChildren[]
     status: c.status,
     objective: c.objective,
     createdTime: c.createdTime,
+    detail: {
+      bidStrategy: c.bidStrategy,
+      dailyBudget: c.dailyBudget,
+      lifetimeBudget: c.lifetimeBudget,
+    },
     adSets: c.adSets.map((s) => ({
       id: s.id,
       name: s.name,
       status: s.status,
       placementStrategy: s.placementStrategy,
+      detail: {
+        bidStrategy: s.bidStrategy,
+        dailyBudget: s.dailyBudget,
+        lifetimeBudget: s.lifetimeBudget,
+        optimizationGoal: s.optimizationGoal,
+        ageMin: s.ageMin,
+        ageMax: s.ageMax,
+        genderLabel: s.genderLabel,
+        locations: s.locations,
+        interests: s.interests,
+        platforms: s.platforms,
+      },
     })),
     ads: c.ads.map((a) => ({
       id: a.id,
@@ -209,22 +246,3 @@ export async function getMappingsForLookup(): Promise<MappingForLookup[]> {
   }));
 }
 
-/**
- * Beehiiv doesn't expose a segment's filter definition via the public
- * API (confirmed live, BUILD_LOG.md Round 40), and its real
- * subscriptions endpoint doesn't honor date-range or segment filters
- * either (confirmed live, Round 48) -- so a date-sliced Meta-source
- * subscriber count isn't obtainable, and "the segment that tracks all
- * Meta-sourced subscribers" can only be identified by the naming
- * convention already in use for it ("Meta Source ... (Overall)"), not
- * by inspecting its actual filter. Picks the largest such segment (the
- * broadest/most inclusive date window) rather than summing every
- * match, since narrower "Meta Source - <month>" segments are subsets
- * of the combined one, not additional subscribers.
- */
-export async function getBeehiivMetaSourceTotal(): Promise<number | null> {
-  const rows = await db.query.beehiivSegmentsCache.findMany();
-  const candidates = rows.filter((r) => /^Meta Source.*\(Overall\)$/i.test(r.name));
-  if (candidates.length === 0) return null;
-  return Math.max(...candidates.map((r) => r.totalResults));
-}

@@ -6,6 +6,8 @@ import { DualSeriesTrendChart } from "./DualSeriesTrendChart";
 import { ImpressionsClicksChart } from "./ImpressionsClicksChart";
 import { MultiSelectDropdown } from "./MultiSelectDropdown";
 import { AdCreativeModal } from "./AdCreativeModal";
+import { CampaignDetailModal } from "./CampaignDetailModal";
+import { AdSetDetailModal } from "./AdSetDetailModal";
 import { costPerLead, acquisitionCost } from "@/lib/ads/types";
 import type {
   CampaignWithChildren,
@@ -154,14 +156,12 @@ export function AdsDashboard({
   dailyPlatformMetrics,
   mappings,
   segments,
-  beehiivFallback,
 }: {
   campaigns: CampaignWithChildren[];
   dailyMetrics: AdDailyMetricRow[];
   dailyPlatformMetrics: AdDailyPlatformMetricRow[];
   mappings: MappingForLookup[];
   segments: SegmentOption[];
-  beehiivFallback: number | null;
 }) {
   const [dateFrom, setDateFrom] = useState(() => last28Days().from);
   const [dateTo, setDateTo] = useState(() => last28Days().to);
@@ -172,6 +172,8 @@ export function AdsDashboard({
   const [sortDir, setSortDir] = useState<1 | -1>(-1);
   const [breakdownLevel, setBreakdownLevel] = useState<BreakdownLevel>("campaign");
   const [modalAdId, setModalAdId] = useState<string | null>(null);
+  const [modalCampaignId, setModalCampaignId] = useState<string | null>(null);
+  const [modalAdSetId, setModalAdSetId] = useState<string | null>(null);
 
   const allAdSets = useMemo(
     () => campaigns.flatMap((c) => c.adSets.map((s) => ({ ...s, campaignId: c.id }))),
@@ -284,15 +286,6 @@ export function AdsDashboard({
     return segmentSum(matchingSegmentIds, segmentTotalsById);
   }, [mappings, campaignIds, adSetIds, adIds, segmentTotalsById]);
 
-  const hasEntityFilter = campaignIds.size > 0 || adSetIds.size > 0 || adIds.size > 0;
-
-  /** "Meta leads vs real Beehiiv subscribers" panel keeps the account-wide
-   * "Meta Source (Overall)" segment total -- Beehiiv's real subscriptions
-   * endpoint doesn't honor date-range or segment filters (confirmed live,
-   * BUILD_LOG.md Round 48), so a date-sliced or entity-scoped version of
-   * this number isn't obtainable from the public API today. */
-  const beehiivSubscribersPanel = hasEntityFilter ? beehiivSubscribersMapped : beehiivFallback;
-
   const cpl = costPerLead(totals.spend, totals.leads);
   const trueCac = acquisitionCost(totals.spend, beehiivSubscribersMapped);
 
@@ -328,6 +321,7 @@ export function AdsDashboard({
   }, [filteredMetrics]);
 
   const campaignNameById = useMemo(() => new Map(campaigns.map((c) => [c.id, c.name])), [campaigns]);
+  const campaignInfoById = useMemo(() => new Map(campaigns.map((c) => [c.id, c])), [campaigns]);
   const adSetInfoById = useMemo(() => new Map(allAdSets.map((s) => [s.id, s])), [allAdSets]);
   const adInfoById = useMemo(() => new Map(allAds.map((a) => [a.id, a])), [allAds]);
 
@@ -473,6 +467,14 @@ export function AdsDashboard({
   const breakdownRows = sortRows(breakdownRowsByLevel[breakdownLevel], sortKey, sortDir);
   const breakdownColumnLabel = breakdownLevel === "campaign" ? "Campaign" : breakdownLevel === "adSet" ? "Ad set" : "Ad";
   const modalAd = modalAdId !== null ? adInfoById.get(modalAdId) : undefined;
+  const modalCampaign = modalCampaignId !== null ? campaignInfoById.get(modalCampaignId) : undefined;
+  const modalAdSet = modalAdSetId !== null ? adSetInfoById.get(modalAdSetId) : undefined;
+
+  function onRowClick(id: string) {
+    if (breakdownLevel === "ad") setModalAdId(id);
+    else if (breakdownLevel === "adSet") setModalAdSetId(id);
+    else if (breakdownLevel === "campaign") setModalCampaignId(id);
+  }
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -638,34 +640,6 @@ export function AdsDashboard({
         </div>
       </Card>
 
-      <Card className="mb-4">
-        <Eyebrow>Meta leads vs real Beehiiv subscribers</Eyebrow>
-        <p className="mb-3 text-[11.5px] text-text-muted">
-          Not everyone Meta counts as a lead becomes a real Beehiiv
-          subscriber. Meta&apos;s number here reflects the filters above;
-          Beehiiv&apos;s comes from the account-wide Meta-source segment,
-          which isn&apos;t sliced by date, so treat these as two real
-          numbers worth comparing, not a strict before/after of the same
-          cohort.
-        </p>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="rounded-lg border border-border bg-card-soft p-5 text-center">
-            <div className="font-mono text-[10.5px] uppercase tracking-wide text-text-muted">
-              Meta leads (Ads Manager)
-            </div>
-            <div className="mt-2 font-serif text-[34px] font-bold">{totals.leads.toLocaleString()}</div>
-          </div>
-          <div className="rounded-lg border border-border bg-card-soft p-5 text-center">
-            <div className="font-mono text-[10.5px] uppercase tracking-wide text-text-muted">
-              Beehiiv subscribers (source: Meta)
-            </div>
-            <div className="mt-2 font-serif text-[34px] font-bold text-orange">
-              {beehiivSubscribersPanel !== null ? beehiivSubscribersPanel.toLocaleString() : "N/A"}
-            </div>
-          </div>
-        </div>
-      </Card>
-
       <Card>
         <div className="mb-3 flex items-center justify-between">
           <Eyebrow>{breakdownColumnLabel}s</Eyebrow>
@@ -736,14 +710,11 @@ export function AdsDashboard({
                   const rowFrequency = avgFrequency(row.frequencyImpressionSum, row.impressions);
                   const rowCpm = cpmOf(row.spend, row.impressions);
                   const rowCpc = cpcOf(row.spend, row.linkClicks);
-                  const clickable = breakdownLevel === "ad";
                   return (
                     <tr
                       key={row.id}
-                      onClick={clickable ? () => setModalAdId(row.id) : undefined}
-                      className={`border-b border-border last:border-0 hover:bg-card-soft ${
-                        clickable ? "cursor-pointer" : ""
-                      }`}
+                      onClick={() => onRowClick(row.id)}
+                      className="cursor-pointer border-b border-border last:border-0 hover:bg-card-soft"
                     >
                       <td className="px-3.5 py-2.5">
                         <div className="font-medium">{row.name}</div>
@@ -792,6 +763,24 @@ export function AdsDashboard({
           adStatus={modalAd.status}
           creative={modalAd.creative}
           onClose={() => setModalAdId(null)}
+        />
+      )}
+      {modalCampaign && (
+        <CampaignDetailModal
+          campaignName={modalCampaign.name}
+          campaignStatus={modalCampaign.status}
+          objective={modalCampaign.objective}
+          detail={modalCampaign.detail}
+          onClose={() => setModalCampaignId(null)}
+        />
+      )}
+      {modalAdSet && (
+        <AdSetDetailModal
+          adSetName={modalAdSet.name}
+          adSetStatus={modalAdSet.status}
+          placementStrategy={modalAdSet.placementStrategy}
+          detail={modalAdSet.detail}
+          onClose={() => setModalAdSetId(null)}
         />
       )}
     </div>

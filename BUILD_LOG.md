@@ -2891,3 +2891,103 @@ scaling, watching CPS spike, and pausing. Confirmed the Mapping page's
 existing real mapping was untouched throughout, and `/overview`
 (content dashboard) renders with zero regression. `npx tsc --noEmit`,
 `eslint`, and `next build` all clean.
+
+## Round 50: dropped the Beehiiv-fallback panel, added Campaign/Ad set detail modals
+
+Two requests. First: remove the "Meta leads vs real Beehiiv subscribers"
+Card entirely -- it was the fallback panel that predated the mapping-only
+KPI row built in an earlier round, and had been sitting there unused
+since. Deleted the Card, the now-dead `beehiivFallback` prop threaded
+through `page.tsx` -> `AdsDashboard`, `getBeehiivMetaSourceTotal()` in
+`data.ts`, and a dangling comment reference in `beehiiv/client.ts`.
+
+Second, the bigger one: clicking a Campaign or Ad set row in the
+breakdown table now opens a detail modal, mirroring the existing
+`AdCreativeModal` pattern (fixed overlay, Escape/click-outside to
+close, honest empty states) instead of just the flat table row.
+Campaign modal shows objective and budget strategy; Ad set modal shows
+daily budget, location, target audience, and placement -- plus
+conversion location, which turned out not to be gettable right now
+(see below).
+
+**Verifying real fields before building.** `objective`, `bid_strategy`,
+`daily_budget`, and `lifetime_budget` are all confirmed real fields on
+both Campaign and Ad Set nodes (`ads_get_field_context`, then a live
+`ads_get_ad_entities` call against the real account). One structural
+finding worth keeping: when a campaign has no `daily_budget`/
+`lifetime_budget` of its own, that's not missing data -- it means the
+campaign uses Ad Set Budget Optimization instead of Campaign Budget
+Optimization, and each ad set sets its own budget instead. The modal
+now says so explicitly rather than showing a bare "N/A".
+
+`destination_type`/`promoted_object` (Meta's real fields for
+"conversion location" -- confirmed against Meta's own Marketing API
+docs, not guessed) turned out to be unreachable with what's currently
+available: the Ads MCP's `ads_get_ad_entities` tool is an
+Insights-flavored wrapper, and a live call asking for those two fields
+came back with the tool's full supported-field whitelist, which
+doesn't include either one. The account's real path -- `src/lib/
+meta-ads/client.ts` hitting the Graph API directly -- would work, but
+`META_ACCESS_TOKEN` is blank in `.env.local`; the refresh route's own
+comment already said as much ("Meta isn't configured yet"). Every
+Meta-sourced field in this dashboard, including this round's, has come
+from one-off MCP-research-and-bridge-script backfills, not a live
+`sync.ts` run. Asked the user how to handle just that one field rather
+than guessing or blocking the rest of the feature on it; they chose to
+skip it for now and show it as an honest "N/A" with a caption
+explaining why, rather than mislabeling `optimization_goal` as a
+stand-in.
+
+**What got built:**
+1. **Schema**: `bid_strategy`/`daily_budget`/`lifetime_budget` added to
+   both `ad_campaigns` and `ad_sets`; `ad_sets` also gained
+   `optimization_goal`, `age_min`, `age_max`, `gender_label`,
+   `locations` (jsonb string array), `interests` (jsonb
+   category/name pairs), and `platforms` (jsonb, the real chosen
+   platform list -- only set for manual placement, null for
+   Advantage+). All nullable additive columns; `drizzle-kit push`
+   applied cleanly with no TTY prompt this time.
+2. **`meta-ads/client.ts`**: extended `MetaCampaign`/`MetaAdSet` and
+   the two `list*()` field strings for a future live sync, plus
+   parsing helpers (`bidStrategyLabel` mapping Graph API's raw enum to
+   the label Ads Manager itself shows, `budgetRupeesOf` for the
+   minor-currency-unit string Graph API returns, `locationsOf`/
+   `interestsOf`/`genderLabelOf` for the `targeting` sub-fields) so
+   `sync.ts` writes the same shape whether the data comes from a real
+   token later or this round's MCP backfill now.
+3. **Real backfill**: fetched all 100 campaigns and 153 ad sets in the
+   account live via the MCP tool (one `ads_get_ad_entities` call
+   exceeded the inline token limit and was auto-saved to a file --
+   copied into the scratchpad and parsed with `python3`/`json.load`,
+   plus a 3-ad-set gap closed with a follow-up `filtering: id IN [...]`
+   call), matched against the 27 campaigns / 41 ad sets already synced
+   locally, and wrote the real values via a one-off bridge script.
+   Deleted the script immediately after confirming the update counts
+   (27/27 campaigns, 41/41 ad sets).
+4. **New components**: `CampaignDetailModal.tsx` and
+   `AdSetDetailModal.tsx`, both copying `AdCreativeModal`'s overlay/
+   Escape/click-outside structure. `AdsDashboard.tsx`'s row click
+   handler now branches on `breakdownLevel` (campaign / adSet / ad)
+   instead of only firing for ads.
+
+**Bug caught and fixed during verification**: the Ad set modal's
+interest chips used `key={name}`, and a real ad set
+(`MM_USA_Only Marketing`) had "Marketing" appear twice across its
+`flexible_spec` groups, producing a duplicate-key React warning and an
+extra redundant chip on screen. Fixed by deduping the interest name
+list before rendering. Caught this via `read_console_messages` during
+live verification, not by inspection -- a reminder that this tool
+buffers console history for the tab's whole lifetime rather than just
+the current page load, so a truly clean read needs a fresh tab, not
+just a reload.
+
+**Verified in the browser**: confirmed the Beehiiv-fallback panel is
+gone with zero visual or console regression on `/ads`, `/ads/mapping`,
+and `/overview`. Opened the Campaign modal on
+`TOF_MM_USA_LeadMagnet_FS_RevisedEVent23-07-27` -- real objective
+(Leads), bid strategy (Highest volume), daily budget (₹2,000), correct
+CBO explanation. Opened the Ad set modal on `MM_USA_Only Marketing` --
+real location (US), age range, "All" gender, manual placement showing
+Facebook/Instagram/Threads (matching its "Manual placements" badge),
+deduped interest chips, and the honest conversion-location caption.
+`npx tsc --noEmit`, `eslint`, and `next build` all clean.

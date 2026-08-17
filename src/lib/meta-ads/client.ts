@@ -68,6 +68,29 @@ export interface MetaCampaign {
   status: string;
   objective?: string;
   created_time: string; // ISO 8601
+  /** Real enum, e.g. LOWEST_COST_WITHOUT_CAP -- see bidStrategyLabel(). */
+  bid_strategy?: string;
+  /** Integer string in the account's minor currency unit (paise for
+   * INR) -- see budgetRupeesOf(). Only one of daily/lifetime is ever
+   * set; both absent means this campaign uses Ad Set Budget
+   * Optimization instead of Campaign Budget Optimization. */
+  daily_budget?: string;
+  lifetime_budget?: string;
+}
+
+export interface MetaTargetingGeo {
+  countries?: string[];
+  regions?: { name: string; country?: string }[];
+  cities?: { name: string; region?: string }[];
+}
+
+export interface MetaFlexibleSpecItem {
+  interests?: { name: string }[];
+  behaviors?: { name: string }[];
+  education_majors?: { name: string }[];
+  life_events?: { name: string }[];
+  industries?: { name: string }[];
+  family_statuses?: { name: string }[];
 }
 
 export interface MetaAdSet {
@@ -76,10 +99,21 @@ export interface MetaAdSet {
   status: string;
   campaign_id: string;
   created_time: string;
+  bid_strategy?: string;
+  daily_budget?: string;
+  lifetime_budget?: string;
+  optimization_goal?: string;
   /** Present only when placements are manually restricted; Meta omits
    * this key entirely for Advantage+/Automatic placements (confirmed
    * live, BUILD_LOG.md Round 49). */
-  targeting?: { publisher_platforms?: string[] };
+  targeting?: {
+    publisher_platforms?: string[];
+    age_min?: number;
+    age_max?: number;
+    genders?: number[]; // [1] = men only, [2] = women only, absent = all
+    geo_locations?: MetaTargetingGeo;
+    flexible_spec?: MetaFlexibleSpecItem[];
+  };
 }
 
 /** "advantage" when Meta is choosing placements automatically (no
@@ -89,6 +123,69 @@ export function placementStrategyOf(adSet: MetaAdSet): "advantage" | "manual" {
   return adSet.targeting?.publisher_platforms && adSet.targeting.publisher_platforms.length > 0
     ? "manual"
     : "advantage";
+}
+
+/** Graph API's raw bid_strategy enum -> the label Ads Manager itself
+ * shows (confirmed against real account data, BUILD_LOG.md Round 50). */
+export function bidStrategyLabel(raw?: string): string | null {
+  switch (raw) {
+    case "LOWEST_COST_WITHOUT_CAP":
+      return "Highest volume";
+    case "LOWEST_COST_WITH_BID_CAP":
+      return "Bid cap";
+    case "COST_CAP":
+      return "Cost per result goal";
+    case "LOWEST_COST_WITH_MIN_ROAS":
+      return "ROAS goal";
+    default:
+      return raw ?? null;
+  }
+}
+
+/** Graph API returns daily_budget/lifetime_budget as an integer string
+ * in the account's minor currency unit (paise for INR). */
+export function budgetRupeesOf(raw?: string): number | null {
+  if (!raw) return null;
+  const cents = parseInt(raw, 10);
+  return Number.isFinite(cents) ? cents / 100 : null;
+}
+
+export function genderLabelOf(genders?: number[]): string | null {
+  if (!genders || genders.length === 0) return null;
+  if (genders.length === 1 && genders[0] === 1) return "Men only";
+  if (genders.length === 1 && genders[0] === 2) return "Women only";
+  return null;
+}
+
+export function locationsOf(geo?: MetaTargetingGeo): string[] {
+  if (!geo) return [];
+  const labels: string[] = [];
+  if (geo.countries) labels.push(...geo.countries);
+  if (geo.regions) labels.push(...geo.regions.map((r) => r.name));
+  if (geo.cities) labels.push(...geo.cities.map((c) => `${c.name}, ${c.region}`));
+  return labels;
+}
+
+export function interestsOf(
+  spec?: MetaFlexibleSpecItem[],
+): { category: string; name: string }[] {
+  if (!spec) return [];
+  const out: { category: string; name: string }[] = [];
+  const keys = [
+    "interests",
+    "behaviors",
+    "education_majors",
+    "life_events",
+    "industries",
+    "family_statuses",
+  ] as const;
+  for (const item of spec) {
+    for (const key of keys) {
+      const values = item[key];
+      if (values) out.push(...values.map((v) => ({ category: key, name: v.name })));
+    }
+  }
+  return out;
 }
 
 export interface MetaAdCreative {
@@ -116,13 +213,15 @@ function adAccountId(): string {
 
 export async function listCampaigns(): Promise<MetaCampaign[]> {
   return metaFetchAll<MetaCampaign>(`/act_${adAccountId()}/campaigns`, {
-    fields: "id,name,status,objective,created_time",
+    fields: "id,name,status,objective,created_time,bid_strategy,daily_budget,lifetime_budget",
   });
 }
 
 export async function listAdSets(): Promise<MetaAdSet[]> {
   return metaFetchAll<MetaAdSet>(`/act_${adAccountId()}/adsets`, {
-    fields: "id,name,status,campaign_id,created_time,targeting{publisher_platforms}",
+    fields:
+      "id,name,status,campaign_id,created_time,bid_strategy,daily_budget,lifetime_budget,optimization_goal," +
+      "targeting{publisher_platforms,age_min,age_max,genders,geo_locations,flexible_spec}",
   });
 }
 
