@@ -1,15 +1,16 @@
 /**
- * Rule-based insight generation: per-edition audience tips (ported verbatim
- * from the wireframe's `generateTips`), plus trailing-window insight cards
+ * Rule-based insight generation for the trailing-window insight cards
  * (Overview's "Tips for improving open rate/CTR" and the Batch 1/Batch 2
- * feedback cards).
+ * feedback cards). The per-edition "Tips and suggestions" card used to live
+ * here too (`generateEditionTips`, a CTR-vs-trailing-average heuristic) but
+ * now comes from the LLM content-quality scoring pass instead (BUILD_LOG.md)
+ * — grounded in the actual weakest-scoring category's justification, not a
+ * templated sentence.
  *
- * All of this is genuinely computed from whatever editions are passed in —
- * never hardcoded copy — but it is still template selection over real
- * numbers, not generated prose. A real Claude-API-backed version of both the
- * per-edition audience-fit judgment and these window-level insight cards is
- * the documented v2 step (see BUILD_LOG.md, "voice-compliance / audience-fit
- * LLM scoring" decision); this is the honest placeholder for v1.
+ * The window-level cards below are genuinely computed from whatever
+ * editions are passed in — never hardcoded copy — but still template
+ * selection over real numbers, not generated prose. A real LLM-backed
+ * version of these is the documented next step (see BUILD_LOG.md).
  */
 
 import type { HookType } from "./subject-line";
@@ -28,29 +29,6 @@ export interface InsightEdition {
   hookType: HookType;
   qualityTotal: number;
   qualityWeakestName: string;
-}
-
-/** Per-edition, per-audience tips shown on the edition detail page. */
-export function generateEditionTips(
-  edition: Pick<InsightEdition, "ctrOverall">,
-  audience: Audience,
-  trailingAvgCtr: number,
-): string {
-  const strong = edition.ctrOverall >= trailingAvgCtr;
-
-  if (audience === "batch1") {
-    return strong
-      ? `This lands well for practitioners: the piece hands over something usable today. Keep closing with one concrete, same-day action, the way Marketing Brew closes nearly every item with a one-line "what to do about it."`
-      : `Add one same-day action tied to the story. Right now this reads as analysis without a task, closer to Marketing Brew's daily format where almost every item ends on a specific next step.`;
-  }
-  if (audience === "batch2") {
-    return strong
-      ? `Good category-signal framing for a leadership reader. Push further by tying the story to a budget or vendor evaluation question, closer to Kevin Indig's Growth Memo.`
-      : `This skews tactical for a leadership reader. Reframe the close around a structural or budget question, the way Axios closes marketing pieces on "why it matters" for decision-makers.`;
-  }
-  return strong
-    ? `Overall click rate is ahead of the trailing-window average. The piece gave readers a clear reason to click through.`
-    : `Overall click rate trails the trailing-window average. Consider ending on a sharper, more specific reader action.`;
 }
 
 export interface HookTypeAverage {

@@ -237,6 +237,10 @@ export interface ContentQualityResult {
   total: number; // 0-100
   categories: ContentQualityCategoryResult[];
   narrative: string;
+  /** 1-2 concrete, actionable tips grounded in whichever categories
+   * scored weakest, for the edition detail page's "Tips and
+   * suggestions" card. */
+  tips: string[];
 }
 
 /**
@@ -295,7 +299,9 @@ ${categoryBlocks}
 
 For each category, give a 0-5 score (or null for N/A) and a one-to-two sentence justification grounded in the actual text. Then write one short overall narrative paragraph (2-3 sentences) summarizing the edition's editorial strengths and weaknesses.
 
-Style: do not use em dashes or en dashes anywhere in your justifications or narrative. Use periods, commas, or "and"/"but" instead.`;
+Finally, look back over the categories you just scored and pick the 1 or 2 with the most room for improvement (lowest score relative to weight, or a justification that flags a real weakness — skip this if every category is already strong). For each one, write one concrete, specific, actionable tip the editor could apply to the next edition, grounded in that category's own justification. Write it like real editorial feedback ("Cut the second paragraph's background and open with the number instead"), never a generic platitude ("Make it more engaging"). Return these as "tips" — an array of 1-2 short strings, or a single string acknowledging there's nothing significant to flag if every category already scored well.
+
+Style: do not use em dashes or en dashes anywhere in your justifications, narrative, or tips. Use periods, commas, or "and"/"but" instead.`;
 }
 
 export const CONTENT_QUALITY_JSON_SCHEMA = {
@@ -324,7 +330,13 @@ export const CONTENT_QUALITY_JSON_SCHEMA = {
         maxItems: CONTENT_QUALITY_CATEGORIES.length,
       },
       narrative: { type: "string" },
+      tips: {
+        type: "array",
+        items: { type: "string" },
+        minItems: 1,
+        maxItems: 2,
+      },
     },
-    required: ["categories", "narrative"],
+    required: ["categories", "narrative", "tips"],
   },
 } as const;

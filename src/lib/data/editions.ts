@@ -241,6 +241,7 @@ export async function getContentQualityScore(
     total: row.total,
     categories: row.categories as ContentQualityCategoryResult[],
     narrative: row.narrative,
+    tips: row.tips as string[],
     provider: row.provider,
     model: row.model,
     scoredAt: new Date(row.scoredAt),

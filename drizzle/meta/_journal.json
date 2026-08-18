@@ -92,6 +92,13 @@
       "when": 1786962906067,
       "tag": "0012_campaign_adset_details",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1787068050547,
+      "tag": "0013_content_quality_tips",
+      "breakpoints": true
     }
   ]
 }

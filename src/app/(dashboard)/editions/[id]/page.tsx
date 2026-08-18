@@ -8,7 +8,7 @@ import {
   canFlag,
 } from "@/lib/data/editions";
 import { computeQualityScore } from "@/lib/scoring/quality-score";
-import { generateEditionTips, type Audience } from "@/lib/scoring/insights";
+import type { Audience } from "@/lib/scoring/insights";
 import { usDate } from "@/lib/format";
 import { StatCard, GradientStatCard, Card, Eyebrow, EmptyState } from "@/components/dashboard/ui";
 import { PollChart } from "@/components/dashboard/PollChart";
@@ -49,7 +49,6 @@ export default async function EditionDetailPage({
     audience,
   });
   const flaggable = canFlag(edition.publishedAt);
-  const tips = generateEditionTips(edition, audience, avgCtr);
 
   const editorialLinks = edition.topLinks;
 
@@ -86,8 +85,8 @@ export default async function EditionDetailPage({
 
       {!flaggable && (
         <div className="mb-4 rounded-lg border border-orange bg-warning-bg px-4 py-3 text-[12.5px]">
-          This edition published less than 24 hours ago. Performance flagging and tips are
-          suppressed until a full day of data has come in.
+          This edition published less than 24 hours ago. Performance flagging is suppressed
+          until a full day of data has come in.
         </div>
       )}
 
@@ -127,12 +126,21 @@ export default async function EditionDetailPage({
         <ContentQualityPanel result={contentQuality} />
       </Card>
 
-      {flaggable && (
-        <Card soft className="mb-4">
-          <Eyebrow>Tips and suggestions</Eyebrow>
-          <p className="text-[13px] leading-relaxed">{tips}</p>
-        </Card>
-      )}
+      <Card soft className="mb-4">
+        <Eyebrow>Tips and suggestions</Eyebrow>
+        {contentQuality ? (
+          <ul className="list-disc space-y-1.5 pl-4 text-[13px] leading-relaxed">
+            {contentQuality.tips.map((tip, i) => (
+              <li key={i}>{tip}</li>
+            ))}
+          </ul>
+        ) : (
+          <EmptyState>
+            Not analyzed yet. Click &quot;Analyze content&quot; in the navbar to generate
+            tips for this edition (requires local API keys).
+          </EmptyState>
+        )}
+      </Card>
 
       <div className="grid grid-cols-2 gap-3.5">
         <div className="overflow-hidden rounded-[10px] border border-border bg-card">

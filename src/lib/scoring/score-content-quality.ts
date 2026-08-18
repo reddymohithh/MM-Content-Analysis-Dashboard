@@ -18,6 +18,7 @@ interface LlmCategoryResponse {
 interface LlmResponse {
   categories: LlmCategoryResponse[];
   narrative: string;
+  tips: string[];
 }
 
 export interface ScoredContentQuality extends ContentQualityResult {
@@ -53,5 +54,12 @@ export async function scoreEditionContentQuality(
 
   const { total, categories } = computeContentQualityTotal(response.categories);
 
-  return { total, categories, narrative: response.narrative, provider: provider.id, model };
+  return {
+    total,
+    categories,
+    narrative: response.narrative,
+    tips: response.tips,
+    provider: provider.id,
+    model,
+  };
 }

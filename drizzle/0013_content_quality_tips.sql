@@ -1,0 +1,1 @@
+ALTER TABLE "content_quality_scores" ADD COLUMN "tips" jsonb NOT NULL;

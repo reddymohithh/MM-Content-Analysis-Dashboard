@@ -79,6 +79,7 @@ export async function POST() {
           total: result.total,
           categories: result.categories,
           narrative: result.narrative,
+          tips: result.tips,
         })
         .onConflictDoUpdate({
           target: contentQualityScores.editionId,
@@ -88,6 +89,7 @@ export async function POST() {
             total: result.total,
             categories: result.categories,
             narrative: result.narrative,
+            tips: result.tips,
             scoredAt: new Date(),
           },
         });
