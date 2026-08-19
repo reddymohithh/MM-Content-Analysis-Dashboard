@@ -28,6 +28,18 @@ function Bullets({ items }: { items: string[] }) {
   );
 }
 
+/** Compact label:value line for Section 22's short summary answers --
+ * deliberately terser than Bullets, since these are meant to compress
+ * Sections 17/18's detail, not restate it. */
+function SummaryLine({ label, value }: { label: string; value: string }) {
+  return (
+    <p className="text-[11.5px] leading-relaxed">
+      <span className="font-semibold text-text-muted">{label}: </span>
+      {value}
+    </p>
+  );
+}
+
 function ScoreAssessmentRow({ label, score, assessment, max = 5 }: { label: string; score: number; assessment: string; max?: number }) {
   return (
     <div className="border-b border-border py-2 last:border-0">
@@ -101,30 +113,43 @@ export function ContentQualityPanel({
 
       <SectionLabel>Category scores</SectionLabel>
       <div className="space-y-3">
-        {result.categories.map((c) => (
-          <div key={c.key}>
-            <div className="mb-1 flex items-baseline justify-between text-[13px]">
-              <span>
-                {c.label}{" "}
-                <span className="font-mono text-[10px] text-text-faint">
-                  {Math.round(c.weight * 100)}% wt
+        {result.categories.map((c) => {
+          const hasAudienceSplit = c.practitionersScore !== null && c.leadershipScore !== null;
+          return (
+            <div key={c.key}>
+              <div className="mb-1 flex items-baseline justify-between text-[13px]">
+                <span>
+                  {c.label}{" "}
+                  <span className="font-mono text-[10px] text-text-faint">
+                    {Math.round(c.weight * 100)}% wt
+                  </span>
                 </span>
-              </span>
-              <span className="font-semibold">{c.score === null ? "N/A" : `${c.score}/5`}</span>
+                <span className="font-semibold">
+                  {c.score === null ? "N/A" : `${c.score}/5`}
+                  {hasAudienceSplit && (
+                    <span className="ml-1 font-normal text-text-faint">(Combined)</span>
+                  )}
+                </span>
+              </div>
+              {hasAudienceSplit && (
+                <div className="mb-1 text-[11px] text-text-muted">
+                  Practitioners {c.practitionersScore}/5 &middot; Leadership {c.leadershipScore}/5 (Section 7.1)
+                </div>
+              )}
+              <div className="h-2 w-full rounded-full bg-border">
+                <div
+                  className="h-2 rounded-full"
+                  style={{
+                    width: c.score === null ? "100%" : `${(c.score / 5) * 100}%`,
+                    background: scoreColor(c.score),
+                    opacity: c.score === null ? 0.3 : 1,
+                  }}
+                />
+              </div>
+              <p className="mt-1 text-[11.5px] leading-relaxed text-text-muted">{c.justification}</p>
             </div>
-            <div className="h-2 w-full rounded-full bg-border">
-              <div
-                className="h-2 rounded-full"
-                style={{
-                  width: c.score === null ? "100%" : `${(c.score / 5) * 100}%`,
-                  background: scoreColor(c.score),
-                  opacity: c.score === null ? 0.3 : 1,
-                }}
-              />
-            </div>
-            <p className="mt-1 text-[11.5px] leading-relaxed text-text-muted">{c.justification}</p>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <SectionLabel>Audience fit</SectionLabel>
@@ -336,6 +361,36 @@ export function ContentQualityPanel({
         <span className="font-semibold">Single most valuable change: </span>
         {result.finalSummary.singleMostValuableChange}
       </p>
+
+      <div className="mt-4 grid grid-cols-2 gap-4">
+        <div className="rounded-lg bg-card-soft p-3">
+          <div className="mb-1.5 font-mono text-[9.5px] uppercase tracking-wide text-text-muted">
+            Practitioners summary
+          </div>
+          <SummaryLine label="Doing right" value={result.finalSummary.practitioners.doingRight} />
+          <SummaryLine label="Improve" value={result.finalSummary.practitioners.shouldImprove} />
+          <SummaryLine label="Add" value={result.finalSummary.practitioners.shouldAdd} />
+          <SummaryLine label="Preserve" value={result.finalSummary.practitioners.shouldPreserve} />
+          <SummaryLine label="Highest impact" value={result.finalSummary.practitioners.highestImpactImprovement} />
+        </div>
+        <div className="rounded-lg bg-card-soft p-3">
+          <div className="mb-1.5 font-mono text-[9.5px] uppercase tracking-wide text-text-muted">
+            Leadership summary
+          </div>
+          <SummaryLine label="Doing right" value={result.finalSummary.leadership.doingRight} />
+          <SummaryLine label="Improve" value={result.finalSummary.leadership.shouldImprove} />
+          <SummaryLine label="Add" value={result.finalSummary.leadership.shouldAdd} />
+          <SummaryLine label="Preserve" value={result.finalSummary.leadership.shouldPreserve} />
+          <SummaryLine label="Highest impact" value={result.finalSummary.leadership.highestImpactImprovement} />
+        </div>
+      </div>
+      <div className="mt-3 rounded-lg bg-card-soft p-3">
+        <div className="mb-1.5 font-mono text-[9.5px] uppercase tracking-wide text-text-muted">
+          Cross-batch summary
+        </div>
+        <SummaryLine label="Balanced?" value={result.finalSummary.crossBatch.balanced} />
+        <SummaryLine label="Next edition" value={result.finalSummary.crossBatch.nextEditionDifference} />
+      </div>
     </div>
   );
 }

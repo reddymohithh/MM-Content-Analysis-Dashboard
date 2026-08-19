@@ -14,6 +14,8 @@ interface LlmCategoryResponse {
   key: ContentQualityCategoryKey;
   score: number | null;
   justification: string;
+  practitionersScore: number | null;
+  leadershipScore: number | null;
 }
 
 /** Everything CONTENT_QUALITY_JSON_SCHEMA asks for besides categories

@@ -25,12 +25,20 @@ import {
 } from "./content-quality";
 import type { StoredContentQualityScore } from "@/lib/data/editions";
 
-const RAW_SCORES: { key: ContentQualityCategoryKey; score: number | null; justification: string }[] = [
+const RAW_SCORES: {
+  key: ContentQualityCategoryKey;
+  score: number | null;
+  justification: string;
+  practitionersScore?: number | null;
+  leadershipScore?: number | null;
+}[] = [
   {
     key: "audience_relevance",
-    score: 4,
+    score: 4, // Combined (Section 7.1) -- this is what feeds the weighted total, same as any other category
     justification:
       "The piece speaks directly to the newsletter's usual reader and assumes the industry context they already have, without over-explaining basics.",
+    practitionersScore: 4,
+    leadershipScore: 3,
   },
   {
     key: "topic_selection",
@@ -264,6 +272,24 @@ export const SAMPLE_CONTENT_QUALITY: StoredContentQualityScore = {
     biggestStrength: "Clear, confidently voiced writing that's easy to read quickly.",
     biggestWeakness: "Stories end on description rather than an action or implication.",
     singleMostValuableChange: "Close every major item with a concrete, audience-specific next step.",
+    practitioners: {
+      doingRight: "Explanations are clear and pitched at the right experience level.",
+      shouldImprove: "Close stories on a testable action, not just a fact.",
+      shouldAdd: "A short implementation guide tied to the lead story.",
+      shouldPreserve: "The consistent, human voice.",
+      highestImpactImprovement: "End the lead story with one concrete, same-week action.",
+    },
+    leadership: {
+      doingRight: "Surfaces genuinely significant, credibly sourced developments.",
+      shouldImprove: "Make the strategic or budget-level implication explicit.",
+      shouldAdd: "A one-line 'what this means for marketing leaders' close.",
+      shouldPreserve: "The senior-appropriate, non-tactical tone.",
+      highestImpactImprovement: "Add one explicit strategic implication to the lead story.",
+    },
+    crossBatch: {
+      balanced: "Yes, roughly balanced, neither audience is clearly better served.",
+      nextEditionDifference: "Close every major item with an audience-specific implication or action.",
+    },
   },
   provider: "example",
   model: "Sample only, not yet scored",

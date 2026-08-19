@@ -60,12 +60,21 @@ export interface ContentQualityCategoryResult {
   key: ContentQualityCategoryKey;
   label: string;
   weight: number;
-  /** 0-5, or null when the LLM judged this category N/A for this edition. */
+  /** 0-5, or null when the LLM judged this category N/A for this edition.
+   * For audience_relevance specifically, this is the Combined score
+   * (Section 7.1) -- the same value that feeds the weighted total below,
+   * exactly as for every other category. */
   score: number | null;
   /** This category's actual contribution to the 100-point total, after N/A
    * weight redistribution -- null categories always show 0 here. */
   effectiveWeight: number;
   justification: string;
+  /** Section 7.1: "Evaluate [Audience Relevance] separately for
+   * Practitioners and Leadership." Populated only for audience_relevance;
+   * null for every other category. Display-only -- never enters the
+   * weighted total, which uses `score` (Combined) exactly as before. */
+  practitionersScore: number | null;
+  leadershipScore: number | null;
 }
 
 // --- Section 12: score -> classification (computed by us, not the LLM, so
@@ -201,15 +210,34 @@ export interface ContentOpportunity {
   suggestedTreatment: SuggestedTreatment;
 }
 
-// --- Section 22: Final Feedback Summary (Overall only -- the Practitioner/
-// Leadership/Cross-Batch sub-parts are the same questions already answered
-// in batch1/batch2/crossBatch above; Section 23's own closing note says not
-// to repeat the same point across sections, so those aren't re-asked) -----
+// --- Section 22: Final Feedback Summary --------------------------------
+// Four sub-sections, all required. Deliberately concise (short answers,
+// not the bulleted lists Sections 17/18 already carry) -- this is meant to
+// be a compressed closing summary, not a restatement of that detail.
+
+/** Section 22's Practitioners/Leadership sub-summary: the same five
+ * questions, answered in one short sentence each. */
+export interface AudienceFinalSummary {
+  doingRight: string;
+  shouldImprove: string;
+  shouldAdd: string;
+  shouldPreserve: string;
+  highestImpactImprovement: string;
+}
+
+/** Section 22's Cross-Batch sub-summary: two questions, not five. */
+export interface CrossBatchFinalSummary {
+  balanced: string; // "Is the edition balanced between the two audiences?"
+  nextEditionDifference: string; // "What should the next edition do differently..."
+}
 
 export interface FinalSummary {
   biggestStrength: string;
   biggestWeakness: string;
   singleMostValuableChange: string;
+  practitioners: AudienceFinalSummary;
+  leadership: AudienceFinalSummary;
+  crossBatch: CrossBatchFinalSummary;
 }
 
 export interface ContentQualityResult {
@@ -243,9 +271,21 @@ export interface ContentQualityResult {
  * redistributing their weight proportionally across the remaining
  * categories -- exactly the rule the checklist specifies (Section 4). Done
  * in our own code rather than trusted to the LLM's arithmetic.
+ *
+ * `practitionersScore`/`leadershipScore` (Section 7.1, audience_relevance
+ * only) pass straight through to the output unchanged -- they play no part
+ * in this calculation. The weighting math below is exactly what it was
+ * before Section 7.1 was accounted for: one `score` per category, same
+ * formula, same single Global Content Quality Score.
  */
 export function computeContentQualityTotal(
-  raw: { key: ContentQualityCategoryKey; score: number | null; justification: string }[],
+  raw: {
+    key: ContentQualityCategoryKey;
+    score: number | null;
+    justification: string;
+    practitionersScore?: number | null;
+    leadershipScore?: number | null;
+  }[],
 ): { total: number; categories: ContentQualityCategoryResult[] } {
   const applicable = raw.filter((r) => r.score !== null);
   const applicableWeightSum = applicable.reduce((sum, r) => {
@@ -264,11 +304,15 @@ export function computeContentQualityTotal(
       score: r.score,
       effectiveWeight,
       justification: r.justification,
+      practitionersScore: r.practitionersScore ?? null,
+      leadershipScore: r.leadershipScore ?? null,
     };
   });
 
   // score is 0-5; *20 puts a perfect score at 100, then weighted by each
-  // category's share of the redistributed 100%.
+  // category's share of the redistributed 100%. Unchanged from before
+  // Section 7.1 support was added -- practitionersScore/leadershipScore
+  // never enter this sum.
   const total = Math.round(
     categories.reduce((sum, c) => sum + (c.score ?? 0) * 20 * c.effectiveWeight, 0),
   );
@@ -312,6 +356,20 @@ const stringArray = (minItems: number, maxItems: number) => ({
   maxItems,
 });
 
+const audienceFinalSummarySchema = (label: string) => ({
+  type: "object",
+  description: `Section 22, ${label} sub-summary. Five short, concise answers -- one sentence each, not a restatement of Section 17's detailed lists.`,
+  additionalProperties: false,
+  properties: {
+    doingRight: { type: "string", description: "What are we doing right?" },
+    shouldImprove: { type: "string", description: "What should we improve?" },
+    shouldAdd: { type: "string", description: "What should we add?" },
+    shouldPreserve: { type: "string", description: "What should we preserve?" },
+    highestImpactImprovement: { type: "string", description: "What is the single highest-impact improvement?" },
+  },
+  required: ["doingRight", "shouldImprove", "shouldAdd", "shouldPreserve", "highestImpactImprovement"],
+});
+
 const audienceFeedbackSchema = (label: string) => ({
   type: "object",
   description: `Section 17, ${label}: Feedback.`,
@@ -346,11 +404,31 @@ export const CONTENT_QUALITY_JSON_SCHEMA = {
               type: ["integer", "null"],
               minimum: 0,
               maximum: 5,
-              description: "0-5 per Section 6's scale, or null if this category is genuinely N/A for this edition.",
+              description:
+                "0-5 per Section 6's scale, or null if this category is genuinely N/A for this edition. " +
+                "For audience_relevance specifically, this is the Combined score (see practitionersScore/" +
+                "leadershipScore below) -- the single value that feeds the weighted Global Content Quality Score, " +
+                "same as every other category.",
             },
             justification: { type: "string" },
+            practitionersScore: {
+              type: ["integer", "null"],
+              minimum: 0,
+              maximum: 5,
+              description:
+                "Section 7.1: 'Evaluate [Audience Relevance] separately for Practitioners and Leadership.' " +
+                "Only set this for the audience_relevance category -- null for every other category.",
+            },
+            leadershipScore: {
+              type: ["integer", "null"],
+              minimum: 0,
+              maximum: 5,
+              description:
+                "Section 7.1's Leadership counterpart to practitionersScore. Only set for audience_relevance, " +
+                "null for every other category.",
+            },
           },
-          required: ["key", "score", "justification"],
+          required: ["key", "score", "justification", "practitionersScore", "leadershipScore"],
         },
         minItems: CONTENT_QUALITY_CATEGORIES.length,
         maxItems: CONTENT_QUALITY_CATEGORIES.length,
@@ -513,14 +591,36 @@ export const CONTENT_QUALITY_JSON_SCHEMA = {
       finalSummary: {
         type: "object",
         description:
-          "Section 22 Final Feedback Summary, Overall sub-section only (the Practitioners/Leadership/Cross-Batch sub-sections there repeat batch1/batch2/crossBatch above, so are not re-asked here per Section 23's own instruction not to repeat points across sections).",
+          "Section 22 Final Feedback Summary, all four required sub-sections. Keep every answer short and " +
+          "concise -- this closes the analysis, it does not restate Sections 17/18's detailed lists.",
         additionalProperties: false,
         properties: {
-          biggestStrength: { type: "string" },
-          biggestWeakness: { type: "string" },
-          singleMostValuableChange: { type: "string" },
+          biggestStrength: { type: "string", description: "Overall: what is the biggest strength of this edition?" },
+          biggestWeakness: { type: "string", description: "Overall: what is the biggest weakness?" },
+          singleMostValuableChange: {
+            type: "string",
+            description: "Overall: what single change would most improve the next edition?",
+          },
+          practitioners: audienceFinalSummarySchema("Practitioners"),
+          leadership: audienceFinalSummarySchema("Leadership"),
+          crossBatch: {
+            type: "object",
+            description: "Section 22, Cross-Batch sub-summary. Two short answers.",
+            additionalProperties: false,
+            properties: {
+              balanced: { type: "string", description: "Is the edition balanced between the two audiences?" },
+              nextEditionDifference: {
+                type: "string",
+                description: "What should the next edition do differently to serve both audiences better?",
+              },
+            },
+            required: ["balanced", "nextEditionDifference"],
+          },
         },
-        required: ["biggestStrength", "biggestWeakness", "singleMostValuableChange"],
+        required: [
+          "biggestStrength", "biggestWeakness", "singleMostValuableChange",
+          "practitioners", "leadership", "crossBatch",
+        ],
       },
     },
     required: [

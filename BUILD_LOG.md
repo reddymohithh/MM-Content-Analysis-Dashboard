@@ -3412,3 +3412,69 @@ and `/overview`. `npx tsc --noEmit`, `eslint`, and `next build` all
 clean. Real end-to-end verification against `gpt-5.6-luna` -- including
 whether a single structured-output call this large stays reliable in
 practice -- is still pending the real `OPENAI_API_KEY`.
+
+## Round 57: fixed both gaps from Round 56's checklist audit
+
+Asked whether "only the Feedback block changes per batch, everything
+else is shared" was actually what the checklist said, not just what I
+built. Re-read the saved checklist file directly rather than trust my
+own earlier summary of it, and found two real gaps: Section 7.1 says
+Audience Relevance must be "evaluated separately for Practitioners and
+Leadership" (a requirement inside the single Global Content Quality
+Score, not the same thing as the separate Audience Fit table), and
+Section 22's Final Feedback Summary has four required sub-sections
+(Overall, Practitioners, Leadership, Cross-Batch); only Overall had
+been built. User asked for both fixed without changing the weighting
+math itself.
+
+**Gap 1**: `ContentQualityCategoryResult` gained
+`practitionersScore`/`leadershipScore`, populated only for
+`audience_relevance` (null for the other 11 categories) -- the existing
+`score` field now explicitly represents the *Combined* value for that
+one category, same as it always represented the single value for every
+other category, and is still the only number `computeContentQualityTotal`
+ever sums into the weighted total. That function's actual math is
+untouched; the two new fields pass through unused by the calculation,
+confirmed by re-reading its own updated doc comment against the diff
+before moving on. This was the point of the user's instruction --
+Section 6's one 0-100 score stays real, Section 7.1's requirement is
+satisfied as a display-only breakdown inside the Audience Relevance
+category, not a second scoring system.
+
+**Gap 2**: `FinalSummary` gained `practitioners`/`leadership`
+(`AudienceFinalSummary`: doingRight/shouldImprove/shouldAdd/
+shouldPreserve/highestImpactImprovement, the same five questions
+Section 22 lists) and `crossBatch` (`CrossBatchFinalSummary`: balanced/
+nextEditionDifference -- deliberately only two fields, since Section
+22's actual Cross-Batch sub-part asks two questions, not five; matched
+what the checklist literally says rather than the user's own
+generalized "five questions" phrasing, and this discrepancy is worth
+surfacing rather than silently picking one). JSON Schema descriptions
+on every field say "concise, one sentence, not a restatement of
+Sections 17/18," matching the user's explicit ask to avoid duplicating
+that detail.
+
+No DB migration needed for either gap -- `categories` and `analysis`
+are both jsonb columns, so a richer shape just flows through the
+existing columns.
+
+`ContentQualityPanel.tsx`: the Audience Relevance category row now
+shows "X/5 (Combined)" plus a "Practitioners X/5 · Leadership X/5
+(Section 7.1)" line every other category doesn't get. Final Feedback
+Summary gained two compact side-by-side cards (Practitioners/Leadership,
+five short label:value lines each, a new `SummaryLine` component
+deliberately terser than the `Bullets` list style used everywhere else
+in the panel, to visually read as compressed) plus a Cross-Batch card
+with two lines.
+
+**Verified in the browser**: opened "Crocs Just Hired a 6-Foot Mascot,"
+confirmed the Audience Relevance row alone shows the Practitioners/
+Leadership breakdown while all 11 other categories still show a plain
+score, confirmed the total stayed at 67% (same as before this round --
+proof the weighting math genuinely didn't change), confirmed all four
+Final Feedback Summary sub-sections render. Checked with `?audience=
+batch2` that both new sections stay identical regardless of which
+batch is selected, which is correct -- neither Section 7.1 nor Section
+22 is toggle-scoped in the checklist, both are always-both-audiences by
+design. Zero console errors. `npx tsc --noEmit`, `eslint`, and
+`next build` all clean.
