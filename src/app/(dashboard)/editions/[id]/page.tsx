@@ -9,6 +9,7 @@ import {
 } from "@/lib/data/editions";
 import { computeQualityScore } from "@/lib/scoring/quality-score";
 import type { Audience } from "@/lib/scoring/insights";
+import { SAMPLE_CONTENT_QUALITY } from "@/lib/scoring/sample-content-quality";
 import { usDate } from "@/lib/format";
 import { StatCard, GradientStatCard, Card, Eyebrow, EmptyState } from "@/components/dashboard/ui";
 import { PollChart } from "@/components/dashboard/PollChart";
@@ -17,6 +18,14 @@ import { AudienceLensButtons } from "@/components/dashboard/AudienceLensButtons"
 import { ContentQualityPanel } from "@/components/dashboard/ContentQualityPanel";
 
 export const dynamic = "force-dynamic";
+
+function SampleBadge() {
+  return (
+    <div className="mb-3 inline-block rounded bg-orange/15 px-2 py-1 font-mono text-[9.5px] font-bold uppercase tracking-wide text-orange">
+      Sample preview, not real data
+    </div>
+  );
+}
 
 export default async function EditionDetailPage({
   params,
@@ -123,7 +132,21 @@ export default async function EditionDetailPage({
           rate, CTR, polls, or unsubscribes, which aren&apos;t valid content-quality signals
           on their own.
         </p>
-        <ContentQualityPanel result={contentQuality} />
+        {contentQuality ? (
+          <ContentQualityPanel result={contentQuality} />
+        ) : (
+          <div>
+            <EmptyState>
+              Not analyzed yet. Click &quot;Analyze content&quot; in the navbar to run the
+              editorial content-quality checklist against this edition (requires local API
+              keys).
+            </EmptyState>
+            <div className="mt-4 rounded-lg border-2 border-dashed border-orange/40 bg-card-soft p-4">
+              <SampleBadge />
+              <ContentQualityPanel result={SAMPLE_CONTENT_QUALITY} />
+            </div>
+          </div>
+        )}
       </Card>
 
       <Card soft className="mb-4">
@@ -135,10 +158,20 @@ export default async function EditionDetailPage({
             ))}
           </ul>
         ) : (
-          <EmptyState>
-            Not analyzed yet. Click &quot;Analyze content&quot; in the navbar to generate
-            tips for this edition (requires local API keys).
-          </EmptyState>
+          <div>
+            <EmptyState>
+              Not analyzed yet. Click &quot;Analyze content&quot; in the navbar to generate
+              tips for this edition (requires local API keys).
+            </EmptyState>
+            <div className="mt-4 rounded-lg border-2 border-dashed border-orange/40 bg-card p-4">
+              <SampleBadge />
+              <ul className="list-disc space-y-1.5 pl-4 text-[13px] leading-relaxed">
+                {SAMPLE_CONTENT_QUALITY.tips.map((tip, i) => (
+                  <li key={i}>{tip}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
         )}
       </Card>
 
