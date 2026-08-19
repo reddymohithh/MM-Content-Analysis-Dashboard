@@ -21,6 +21,7 @@ export default async function EditionsListPage() {
     return {
       id: e.id,
       subject: e.subject,
+      webUrl: e.webUrl,
       publishedAt: e.publishedAt.toISOString(),
       openRate: e.openRate,
       ctrOverall: e.ctrOverall,

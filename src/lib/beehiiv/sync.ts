@@ -147,6 +147,7 @@ export async function syncBeehiivData(): Promise<BeehiivSyncResult> {
         subject,
         preview: post.preview_text ?? "",
         publishedAt: new Date((post.publish_date ?? Date.now() / 1000) * 1000),
+        webUrl: post.web_url ?? null,
         openRate,
         ctrRaw,
         ctrVerified,
@@ -165,6 +166,7 @@ export async function syncBeehiivData(): Promise<BeehiivSyncResult> {
         set: {
           subject,
           preview: post.preview_text ?? "",
+          webUrl: post.web_url ?? null,
           openRate,
           ctrRaw,
           ctrVerified,

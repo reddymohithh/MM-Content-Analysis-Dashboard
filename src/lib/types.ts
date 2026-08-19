@@ -37,6 +37,10 @@ export interface Edition {
   subject: string;
   preview: string;
   publishedAt: Date;
+  /** Real published URL on the newsletter's own site. Null for synthetic
+   * demo data, or a real edition that hasn't been re-synced since this
+   * field was added. */
+  webUrl: string | null;
   openRate: number;
   ctrOverall: number;
   unsubRate: number;

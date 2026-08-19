@@ -27,6 +27,7 @@ function syntheticEditions(): Edition[] {
     subject: e.subject,
     preview: e.preview,
     publishedAt: new Date(`${e.date}T17:57:00Z`),
+    webUrl: null,
     openRate: e.open,
     ctrOverall: e.ctr,
     unsubRate: e.unsub,
@@ -132,6 +133,7 @@ interface DbEditionRow {
   subject: string;
   preview: string;
   publishedAt: string | Date;
+  webUrl: string | null;
   openRate: number;
   ctrRaw: number;
   unsubRate: number;
@@ -169,6 +171,7 @@ function mapDbEditionToEdition(row: DbEditionRow): Edition {
     subject: row.subject,
     preview: row.preview,
     publishedAt: new Date(row.publishedAt),
+    webUrl: row.webUrl,
     openRate: row.openRate,
     ctrOverall: row.ctrRaw,
     unsubRate: row.unsubRate,

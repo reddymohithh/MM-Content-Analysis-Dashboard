@@ -125,6 +125,10 @@ export interface BeehiivPost {
   status: "draft" | "confirmed" | "archived";
   publish_date?: number; // unix seconds
   displayed_date?: number;
+  /** Real published URL on the newsletter's own site, e.g.
+   * https://www.marketingmonk.so/p/cash-to-qr-codes (confirmed live
+   * against the real API, BUILD_LOG.md). */
+  web_url?: string;
   authors?: string[];
   content_tags?: string[];
   /** Which channel(s) this post actually went out on. */

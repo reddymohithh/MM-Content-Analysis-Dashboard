@@ -8,6 +8,7 @@ import { DataTable } from "./ui";
 export interface EditionRow {
   id: string;
   subject: string;
+  webUrl: string | null;
   publishedAt: string; // ISO
   openRate: number;
   ctrOverall: number;
@@ -166,6 +167,7 @@ export function EditionsExplorer({ editions }: { editions: EditionRow[] }) {
         columns={[
           { label: "Date" },
           { label: "Subject" },
+          { label: "Web url" },
           { label: "Open", align: "right" },
           { label: "CTR", align: "right" },
           { label: "Quality", align: "right" },
@@ -188,6 +190,20 @@ export function EditionsExplorer({ editions }: { editions: EditionRow[] }) {
               >
                 {e.subject}
               </Link>
+            </td>
+            <td className="whitespace-nowrap px-3.5 py-2.5">
+              {e.webUrl ? (
+                <a
+                  href={e.webUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[12.5px] font-medium text-orange no-underline hover:underline"
+                >
+                  Read online
+                </a>
+              ) : (
+                <span className="text-[12.5px] text-text-faint">N/A</span>
+              )}
             </td>
             <td className="p-0">
               <Link href={`/editions/${e.id}`} className="block px-3.5 py-2.5 text-right text-[13px] text-ink no-underline">

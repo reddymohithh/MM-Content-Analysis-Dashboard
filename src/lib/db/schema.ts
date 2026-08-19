@@ -39,6 +39,9 @@ export const editions = pgTable("editions", {
   subject: text("subject").notNull(), // real sent subject line, with emoji
   preview: text("preview").notNull(),
   publishedAt: timestamp("published_at", { withTimezone: true }).notNull(),
+  /** Real published URL on the newsletter's own site (Beehiiv's own
+   * `web_url` field). Null for synthetic demo data. */
+  webUrl: text("web_url"),
 
   openRate: doublePrecision("open_rate").notNull(),
   ctrRaw: doublePrecision("ctr_raw").notNull(),
