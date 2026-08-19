@@ -123,15 +123,10 @@ export default async function EditionDetailPage({
       </Card>
 
       <Card className="mb-4">
-        <div className="mb-1 font-mono text-[11px] uppercase tracking-wide text-heading-soft">
+        <div className="mb-3 font-mono text-[11px] uppercase tracking-wide text-heading-soft">
           Content quality (editorial)
           {contentQuality && <span className="ml-2 text-heading-soft">· {contentQuality.total}%</span>}
         </div>
-        <p className="mb-3 text-[11.5px] text-text-muted">
-          Scored by an LLM against a 12-category editorial checklist. Independent of open
-          rate, CTR, polls, or unsubscribes, which aren&apos;t valid content-quality signals
-          on their own.
-        </p>
         {contentQuality ? (
           <ContentQualityPanel result={contentQuality} />
         ) : (

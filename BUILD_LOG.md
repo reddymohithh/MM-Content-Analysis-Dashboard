@@ -3176,3 +3176,35 @@ confirmed the dashed border and badge render on both cards, and
 confirmed the real "not analyzed yet" message still shows above the
 sample in both. Zero console errors. `npx tsc --noEmit`, `eslint`, and
 `next build` all clean.
+
+## Round 54: donut colors by score, dropped a caption line, confirmed web_url
+
+Three small requests. Removed the "Scored by an LLM against a
+12-category editorial checklist..." caption from the Content quality
+(editorial) card -- the checklist framing is already established by the
+card's own name and by the Tips and suggestions/sample-preview copy
+right below it, so the line was redundant.
+
+Colored the four engagement-score donuts (`QualityDonuts.tsx`) by
+score level instead of a fixed orange -- 80+ green
+(`--color-positive`), 60-79 amber (`--color-amber`), below 60 red
+(`--color-negative`), the same 80/60 thresholds `ContentQualityPanel`
+already uses for its category bars (4/5 and 3/5 on that component's
+0-5 scale), just applied to this component's 0-100 scores instead of
+introducing a different cutoff.
+
+Confirmed, live against the real Beehiiv API (not the docs, not a
+guess) rather than the local `BeehiivPost` interface, which doesn't
+currently map any URL field at all: posts really do carry a `web_url`
+field with the real published URL (`https://www.marketingmonk.so/p/
+cash-to-qr-codes`-shaped), plus `preview_url` and `slug`. Confirmed the
+capability only -- fetching and surfacing it in the UI (Editions list,
+detail page) wasn't asked for yet, so nothing was built against it this
+round.
+
+**Verified in the browser**: opened "Crocs Just Hired a 6-Foot Mascot"
+-- its real poll-satisfaction score (20%) rendered its donut in red,
+the 85%/100%/100% components in green, and the caption line no longer
+appears anywhere above the Content quality card's empty/sample state.
+Zero console errors. `npx tsc --noEmit`, `eslint`, and `next build` all
+clean.

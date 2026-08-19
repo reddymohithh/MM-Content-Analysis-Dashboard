@@ -3,6 +3,14 @@ import type { QualityScoreResult } from "@/lib/scoring/quality-score";
 const R = 42;
 const CIRCUMFERENCE = 2 * Math.PI * R;
 
+/** Same 80/60 thresholds as ContentQualityPanel's category bars (4/5 and
+ * 3/5 on that 0-5 scale), applied here to this component's 0-100 scores. */
+function donutColor(score: number): string {
+  if (score >= 80) return "var(--color-positive)";
+  if (score >= 60) return "var(--color-amber)";
+  return "var(--color-negative)";
+}
+
 export function QualityDonuts({ result }: { result: QualityScoreResult }) {
   return (
     <div>
@@ -21,7 +29,7 @@ export function QualityDonuts({ result }: { result: QualityScoreResult }) {
                 cy={50}
                 r={R}
                 fill="none"
-                stroke="var(--color-orange)"
+                stroke={donutColor(c.score)}
                 strokeWidth={9}
                 strokeLinecap="round"
                 strokeDasharray={`${c.dashArrayFraction * CIRCUMFERENCE} ${CIRCUMFERENCE}`}
