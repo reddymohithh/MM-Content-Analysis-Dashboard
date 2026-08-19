@@ -2,7 +2,11 @@ import "server-only";
 import { desc, eq } from "drizzle-orm";
 import type { Edition, PublicationSnapshot } from "@/lib/types";
 import type { HookType } from "@/lib/scoring/subject-line";
-import type { ContentQualityCategoryResult, ContentQualityResult } from "@/lib/scoring/content-quality";
+import {
+  classifyContentQuality,
+  type ContentQualityCategoryResult,
+  type ContentQualityResult,
+} from "@/lib/scoring/content-quality";
 import {
   SYNTHETIC_EDITIONS,
   SYNTHETIC_PUBLICATION,
@@ -240,11 +244,13 @@ export async function getContentQualityScore(
   });
   if (!row) return null;
 
+  const analysis = row.analysis as Omit<ContentQualityResult, "total" | "classification" | "categories">;
+
   return {
     total: row.total,
+    classification: classifyContentQuality(row.total),
     categories: row.categories as ContentQualityCategoryResult[],
-    batch1: row.batchFeedback.batch1,
-    batch2: row.batchFeedback.batch2,
+    ...analysis,
     provider: row.provider,
     model: row.model,
     scoredAt: new Date(row.scoredAt),

@@ -70,7 +70,28 @@ export async function POST() {
 
       const result = await scoreEditionContentQuality(edition.subject, content);
 
-      const batchFeedback = { batch1: result.batch1, batch2: result.batch2 };
+      // Everything Section 23 asks for besides the 12 category scores;
+      // total/categories get their own columns, and classification is
+      // derived from total on read (classifyContentQuality) rather than
+      // stored, so it can never drift from the number next to it.
+      const analysis = {
+        verdict: result.verdict,
+        audienceFit: result.audienceFit,
+        readerOutcome: result.readerOutcome,
+        storyByStory: result.storyByStory,
+        whatWorked: result.whatWorked,
+        whatDidntWork: result.whatDidntWork,
+        biggestMissedOpportunity: result.biggestMissedOpportunity,
+        batch1: result.batch1,
+        batch2: result.batch2,
+        crossBatch: result.crossBatch,
+        recommendedImprovements: result.recommendedImprovements,
+        nextEditionPlan: result.nextEditionPlan,
+        contentOpportunities: result.contentOpportunities,
+        strengthsToPreserve: result.strengthsToPreserve,
+        criticalFailures: result.criticalFailures,
+        finalSummary: result.finalSummary,
+      };
 
       await db
         .insert(contentQualityScores)
@@ -80,7 +101,7 @@ export async function POST() {
           model: result.model,
           total: result.total,
           categories: result.categories,
-          batchFeedback,
+          analysis,
         })
         .onConflictDoUpdate({
           target: contentQualityScores.editionId,
@@ -89,7 +110,7 @@ export async function POST() {
             model: result.model,
             total: result.total,
             categories: result.categories,
-            batchFeedback,
+            analysis,
             scoredAt: new Date(),
           },
         });

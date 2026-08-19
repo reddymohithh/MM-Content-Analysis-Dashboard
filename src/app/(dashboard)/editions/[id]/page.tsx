@@ -149,7 +149,7 @@ export default async function EditionDetailPage({
         <Eyebrow>Tips and suggestions</Eyebrow>
         {contentQuality ? (
           <ul className="list-disc space-y-1.5 pl-4 text-[13px] leading-relaxed">
-            {contentQuality[audience].tips.map((tip, i) => (
+            {contentQuality[audience].whatWeNeedToWorkOn.map((tip, i) => (
               <li key={i}>{tip}</li>
             ))}
           </ul>
@@ -162,7 +162,7 @@ export default async function EditionDetailPage({
             <div className="mt-4 rounded-lg border-2 border-dashed border-orange/40 bg-card p-4">
               <SampleBadge />
               <ul className="list-disc space-y-1.5 pl-4 text-[13px] leading-relaxed">
-                {SAMPLE_CONTENT_QUALITY[audience].tips.map((tip, i) => (
+                {SAMPLE_CONTENT_QUALITY[audience].whatWeNeedToWorkOn.map((tip, i) => (
                   <li key={i}>{tip}</li>
                 ))}
               </ul>

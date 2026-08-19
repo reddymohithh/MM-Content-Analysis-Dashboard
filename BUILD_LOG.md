@@ -3313,3 +3313,102 @@ specific edition and several other pages (`/editions`, `/overview`).
 `npx tsc --noEmit`, `eslint`, and `next build` all clean. Full
 end-to-end verification against `gpt-5.6-luna` is still pending the
 real `OPENAI_API_KEY`.
+
+## Round 56: full checklist scoring system, not just batch feedback
+
+Immediately after Round 55 shipped, asked to build the larger option
+that had been explicitly deferred: the checklist's complete separate
+scoring system (Section 23's full required output), not just
+audience-specific feedback text swapped by the toggle.
+
+**Schema**: `ContentQualityResult` grew from 4 fields to the full
+Section 23 shape -- `verdict`, `audienceFit` (practitioners/leadership/
+combined, each scored 0-5 with an assessment, combined also carrying
+Section 8's categorical classification), `readerOutcome` (industry
+awareness/upskilling/practical experimentation), `storyByStory`
+(Section 10, one entry per major item with content type, primary
+audience, a 0-100 story quality score, curation necessity 1-10, and
+five prose fields), `whatWorked`/`whatDidntWork`, a
+`biggestMissedOpportunity`, `batch1`/`batch2` (expanded from Round 55's
+`{narrative, tips}` to Section 17's real shape --
+`overallFeedback`/`whatWereDoingRight`/`whatWeNeedToWorkOn`/
+`whatShouldBeAdded`/`takeaway`), `crossBatch` (Section 18), a
+`recommendedImprovements` list, `nextEditionPlan` (Section 19's P0-P3
+priority table), `contentOpportunities` (Section 20),
+`strengthsToPreserve` (Section 21), and `criticalFailures` (Section
+13, empty array is the honest default rather than a manufactured
+issue). `classification` (Section 12's score-to-label mapping) is
+computed by `classifyContentQuality()` from `total`, not asked of the
+LLM, so the label next to a score can never drift from the number.
+
+Section 22's "Final Feedback Summary" only asks for its Overall
+sub-part (`finalSummary`: biggest strength/weakness/single change) --
+its Practitioners/Leadership/Cross-Batch sub-parts ask the same
+questions Section 17/18 already answer, and Section 23's own closing
+line says not to repeat a point across sections, so re-asking them
+would have meant either genuinely duplicate LLM output or the model
+quietly diverging from what it already said two sections earlier.
+
+The JSON Schema (still the only place any "how to answer" instruction
+lives -- the system prompt itself is still the checklist file,
+untouched, unchanged from Round 55) grew to match: per-field
+`description`s point at the specific checklist section each field
+answers, `stringArray()`/`scoredAssessmentSchema()`/
+`audienceFeedbackSchema()` helpers avoid repeating the same shape
+seven times. Storywise items are bounded 1-8, content opportunities
+3-5, next-edition plan items 1-8 -- generous enough for a real edition
+without letting the model run unbounded.
+
+**Sanitization**: with several dozen new string fields, hand-touching
+each one for the dash-stripping pass (as Round 55 did) stopped being
+practical. Replaced with `stripDashesDeep()`, walking the entire
+parsed response recursively before anything else happens to it.
+
+**Database**: `content_quality_scores` dropped `batch_feedback` (Round
+55) for a single `analysis` jsonb column holding everything except
+`total`/`categories` (kept as their own columns) and `classification`
+(computed on read, not stored, for the same drift-proofing reason as
+above). Table still empty (`OPENAI_API_KEY` still blank), so no
+backfill concern. `drizzle-kit generate` and `push` both hit the same
+rename-vs-create TTY prompt as every prior schema round; both driven
+through with `expect` selecting "create column" -- `push`'s spinner
+runs much longer than `generate`'s before showing the prompt, so the
+first `expect` attempt raced past it and needed a longer timeout plus
+a short `sleep` before sending the keystroke on retry. Confirmed
+`drizzle-kit push` reports "No changes detected" after.
+
+**UI**: `ContentQualityPanel.tsx` rewritten to render the full
+analysis in Section 23's order inside the one "Content quality
+(editorial)" card the user scoped this to -- category bars (unchanged
+from before), Audience Fit and Reader Outcome as labeled score rows,
+Story-by-Story as individual cards with content-type/audience/
+curation-necessity tags, What Worked/Didn't Work side by side, the
+Batch 1/2 toggle now switching the entire Feedback block (audience fit
+row + overall feedback + three bulleted lists + takeaway, not just a
+narrative and two tips), Cross-Batch feedback, the improvement plan
+with P0-P3 priority badges (red/orange/amber/gray), Content
+Opportunities, Strengths to Preserve, and the Final Summary. A
+critical-failures banner shows red when the array is non-empty, or the
+checklist's own required phrasing ("No P0 issues identified.") in the
+empty case. "Tips and suggestions" (the separate card below, out of
+this round's scope) now reads `whatWeNeedToWorkOn` instead of the
+retired flat `tips` field, since that's the closest match to what that
+card always meant. Updated the Round 53 sample-preview data to the
+full new shape too, with two genuinely different, still edition-
+agnostic feedback blocks so the toggle visibly does something in the
+sample as well as the real thing.
+
+**Verified in the browser**: restarted the dev server after the schema
+change, opened "Crocs Just Hired a 6-Foot Mascot," and read the full
+rendered page text top to bottom -- confirmed every Section 23
+subsection appears in the right order with real, internally-consistent
+sample data (weighted total matches the category bars, no P0 banner
+shows the honest empty state). Switched to `?audience=batch2` and
+confirmed the engagement section's per-component wording, the Content
+quality panel's audience-fit row, and the entire Feedback block all
+swap to leadership-framed content together, live, from the one toggle.
+Zero console errors in a fresh tab against the edition page, `/editions`,
+and `/overview`. `npx tsc --noEmit`, `eslint`, and `next build` all
+clean. Real end-to-end verification against `gpt-5.6-luna` -- including
+whether a single structured-output call this large stays reliable in
+practice -- is still pending the real `OPENAI_API_KEY`.
