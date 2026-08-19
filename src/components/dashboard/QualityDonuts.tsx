@@ -14,8 +14,6 @@ function donutColor(score: number): string {
 export function QualityDonuts({ result }: { result: QualityScoreResult }) {
   return (
     <div>
-      <p className="mb-4 text-[13px] leading-relaxed">{result.narrative}</p>
-
       <div className="grid grid-cols-4 gap-3">
         {result.components.map((c) => (
           <div

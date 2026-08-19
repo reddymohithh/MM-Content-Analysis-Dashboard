@@ -10,8 +10,10 @@ function scoreColor(score: number | null): string {
 
 export function ContentQualityPanel({
   result,
+  audience,
 }: {
   result: StoredContentQualityScore | null;
+  audience: "batch1" | "batch2";
 }) {
   if (!result) {
     return (
@@ -23,10 +25,12 @@ export function ContentQualityPanel({
     );
   }
 
+  const feedback = result[audience];
+
   return (
     <div>
       <div className="mb-4 flex items-baseline justify-between">
-        <p className="max-w-[70%] text-[13px] leading-relaxed">{result.narrative}</p>
+        <p className="max-w-[70%] text-[13px] leading-relaxed">{feedback.narrative}</p>
         <div className="text-right">
           <div className="font-serif text-[28px] font-bold leading-none">{result.total}%</div>
           <div className="mt-1 font-mono text-[9.5px] uppercase tracking-wide text-text-faint">

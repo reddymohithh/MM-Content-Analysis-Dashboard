@@ -1,14 +1,24 @@
 /**
- * Editorial content-quality rubric — the "Global Newsletter Content Analysis
- * Checklist" the user supplied, ported verbatim (categories, weights, core
- * questions, 0-5 scale, N/A-redistribution rule). This is deliberately
- * separate from src/lib/scoring/quality-score.ts: that module scores reader
- * response (CTR, unsubscribes, polls) against trailing-window benchmarks;
- * this one scores editorial quality of the content itself, which per the
- * checklist's own "Recommended Interpretation" section must NOT be inferred
- * from engagement metrics. This score only ever comes from an LLM (or a
- * human) actually reading the edition's content.
+ * Editorial content-quality rubric. The actual grading standard sent to the
+ * LLM is global-content-analysis-checklist.md, embedded verbatim (word for
+ * word, unmodified) in buildContentQualitySystemPrompt() below -- the
+ * checklist itself is the source of truth, not a paraphrase of it built from
+ * this file's constants. This file only keeps the 12 category
+ * keys/labels/weights (matching the checklist's Section 6/7 exactly) needed
+ * to compute the weighted 0-100 total and render the category breakdown in
+ * the UI, plus the JSON Schema contract the structured-output call is forced
+ * into (a separate mechanism from the prompt text itself).
+ *
+ * Deliberately separate from src/lib/scoring/quality-score.ts: that module
+ * scores reader response (CTR, unsubscribes, polls) against trailing-window
+ * benchmarks; this one scores editorial quality of the content itself, which
+ * the checklist's own Section 14 says must NOT be inferred from engagement
+ * metrics. This score only ever comes from an LLM (or a human) actually
+ * reading the edition's content.
  */
+
+import { readFileSync } from "fs";
+import path from "path";
 
 export type ContentQualityCategoryKey =
   | "audience_relevance"
@@ -28,197 +38,22 @@ export interface ContentQualityCategoryDef {
   key: ContentQualityCategoryKey;
   label: string;
   weight: number; // fraction of 1.0, sums to 1
-  coreQuestion: string;
-  criteria: string[];
 }
 
+/** Matches global-content-analysis-checklist.md Section 6/7 exactly. */
 export const CONTENT_QUALITY_CATEGORIES: ContentQualityCategoryDef[] = [
-  {
-    key: "audience_relevance",
-    label: "Audience Relevance",
-    weight: 0.14,
-    coreQuestion: "If I am the target reader, do I genuinely care about this?",
-    criteria: [
-      "Clearly relevant to the target audience",
-      "Addresses the audience's interests, problems, goals, or curiosity",
-      "Appropriate for the audience's knowledge level",
-      "Fits the newsletter's stated positioning",
-      "Doesn't include information simply because it's trending",
-      "Provides enough context for the intended reader",
-    ],
-  },
-  {
-    key: "topic_selection",
-    label: "Topic / Story Selection",
-    weight: 0.14,
-    coreQuestion: "Of everything the reader could have seen today, was this worth selecting?",
-    criteria: [
-      "Topic is genuinely interesting",
-      "Topic has meaningful significance",
-      "Topic is timely",
-      "Topic has a clear reason for being included",
-      "Editor demonstrates strong judgment in selecting it",
-      "Story isn't generic or easily replaceable",
-      "Selection adds signal rather than noise",
-    ],
-  },
-  {
-    key: "editorial_value_add",
-    label: "Editorial Value-Add",
-    weight: 0.14,
-    coreQuestion: "What did the newsletter add that I wouldn't get from the original source?",
-    criteria: [
-      "Doesn't merely link to the original source",
-      "Summarizes the important parts",
-      "Explains why the information matters",
-      "Adds interpretation",
-      "Connects the story to the reader",
-      "Identifies implications",
-      "Separates important information from unnecessary details",
-      "Provides an editorial opinion where appropriate",
-      "Helps the reader understand rather than simply consume",
-    ],
-  },
-  {
-    key: "originality",
-    label: "Originality & Information Value",
-    weight: 0.09,
-    coreQuestion: "Did I learn something I didn't already know?",
-    criteria: [
-      "Contains new information",
-      "Provides a non-obvious perspective",
-      "Avoids repeating commonly known information",
-      "Introduces useful data, examples, research, or evidence",
-      "Gives the reader something they are unlikely to encounter elsewhere",
-      "Has a clear \"I didn't know that\" moment",
-    ],
-  },
-  {
-    key: "depth_substance",
-    label: "Depth & Substance",
-    weight: 0.09,
-    coreQuestion: "Does this go beyond surface-level information?",
-    criteria: [
-      "Explains the \"what\"",
-      "Explains the \"why\"",
-      "Explains the \"so what\"",
-      "Provides sufficient context",
-      "Doesn't oversimplify important issues",
-      "Uses specific examples",
-      "Avoids shallow commentary",
-      "Depth is appropriate for the format",
-    ],
-  },
-  {
-    key: "accuracy_credibility",
-    label: "Accuracy & Credibility",
-    weight: 0.09,
-    coreQuestion: "Can I trust what I'm being told?",
-    criteria: [
-      "Claims are factually accurate",
-      "Numbers and statistics are correct",
-      "Sources are credible",
-      "Primary sources are used where appropriate",
-      "Claims can be verified",
-      "Sources are clearly attributed",
-      "Quotes are accurate",
-      "Context isn't misleading",
-      "Opinions are distinguishable from facts",
-    ],
-  },
-  {
-    key: "actionability",
-    label: "Actionability / Practical Value",
-    weight: 0.09,
-    coreQuestion: "Can I do something useful with this?",
-    criteria: [
-      "Provides a useful next step",
-      "Gives practical advice",
-      "Provides a framework",
-      "Includes tools/resources",
-      "Gives examples of implementation",
-      "Helps the reader make a decision",
-      "Makes the information usable",
-    ],
-  },
-  {
-    key: "readability_structure",
-    label: "Readability & Content Structure",
-    weight: 0.05,
-    coreQuestion: "Can I understand this quickly without working hard?",
-    criteria: [
-      "Strong opening",
-      "Clear hierarchy",
-      "Logical progression",
-      "Short, readable paragraphs",
-      "Good use of headings",
-      "Appropriate use of bullets",
-      "Effective formatting",
-      "Easy to scan",
-      "No unnecessary repetition",
-      "Appropriate reading length",
-    ],
-  },
-  {
-    key: "narrative_engagement",
-    label: "Narrative / Engagement Quality",
-    weight: 0.05,
-    coreQuestion: "Did this make me want to keep reading?",
-    criteria: [
-      "Creates curiosity",
-      "Maintains attention",
-      "Has momentum",
-      "Uses examples or storytelling effectively",
-      "Creates an emotional or intellectual reaction",
-      "Makes the reader want to continue",
-      "Ends sections effectively",
-    ],
-  },
-  {
-    key: "curation_coherence",
-    label: "Curation & Newsletter Coherence",
-    weight: 0.05,
-    coreQuestion: "Does this feel like one intelligently edited publication?",
-    criteria: [
-      "Stories complement each other",
-      "There's an intentional hierarchy",
-      "The most important content appears first",
-      "Sections feel connected",
-      "Content doesn't feel randomly assembled",
-      "The edition has a clear editorial identity",
-      "There's an appropriate balance between important and lighter content",
-      "The newsletter feels like a curated package rather than an RSS feed",
-    ],
-  },
-  {
-    key: "voice_brand_fit",
-    label: "Voice & Brand Fit",
-    weight: 0.04,
-    coreQuestion: "Could I recognize this newsletter without seeing its name?",
-    criteria: [
-      "Consistent with the newsletter's voice",
-      "Has a recognizable personality",
-      "Tone fits the audience",
-      "Writing feels human",
-      "Avoids generic AI-sounding language",
-      "Maintains editorial consistency",
-      "Strengthens the newsletter's positioning",
-    ],
-  },
-  {
-    key: "memorability",
-    label: "Memorability",
-    weight: 0.03,
-    coreQuestion: "What will I remember tomorrow?",
-    criteria: [
-      "Contains a memorable insight",
-      "Uses strong examples",
-      "Has quotable ideas",
-      "Uses effective analogies",
-      "Gives the reader something worth sharing",
-      "Leaves a clear takeaway",
-    ],
-  },
+  { key: "audience_relevance", label: "Audience Relevance", weight: 0.14 },
+  { key: "topic_selection", label: "Topic / Story Selection", weight: 0.14 },
+  { key: "editorial_value_add", label: "Editorial Value-Add", weight: 0.14 },
+  { key: "originality", label: "Originality & Information Value", weight: 0.09 },
+  { key: "depth_substance", label: "Depth & Substance", weight: 0.09 },
+  { key: "accuracy_credibility", label: "Accuracy & Credibility", weight: 0.09 },
+  { key: "actionability", label: "Actionability / Practical Value", weight: 0.09 },
+  { key: "readability_structure", label: "Readability & Content Structure", weight: 0.05 },
+  { key: "narrative_engagement", label: "Narrative / Engagement Quality", weight: 0.05 },
+  { key: "curation_coherence", label: "Curation & Newsletter Coherence", weight: 0.05 },
+  { key: "voice_brand_fit", label: "Voice & Brand Fit", weight: 0.04 },
+  { key: "memorability", label: "Memorability", weight: 0.03 },
 ];
 
 export interface ContentQualityCategoryResult {
@@ -228,27 +63,31 @@ export interface ContentQualityCategoryResult {
   /** 0-5, or null when the LLM judged this category N/A for this edition. */
   score: number | null;
   /** This category's actual contribution to the 100-point total, after N/A
-   * weight redistribution — null categories always show 0 here. */
+   * weight redistribution -- null categories always show 0 here. */
   effectiveWeight: number;
   justification: string;
+}
+
+/** Section 17's per-batch qualitative feedback, narrowed to what the UI
+ * needs: an overall-feedback narrative and the highest-impact tips. */
+export interface AudienceFeedback {
+  narrative: string;
+  tips: string[];
 }
 
 export interface ContentQualityResult {
   total: number; // 0-100
   categories: ContentQualityCategoryResult[];
-  narrative: string;
-  /** 1-2 concrete, actionable tips grounded in whichever categories
-   * scored weakest, for the edition detail page's "Tips and
-   * suggestions" card. */
-  tips: string[];
+  batch1: AudienceFeedback; // Section 17: Batch 1 -- Practitioners
+  batch2: AudienceFeedback; // Section 17: Batch 2 -- Marketing & Growth Leadership
 }
 
 /**
  * Takes raw 0-5 (or null/N/A) scores per category and computes the final
  * 0-100 total, excluding N/A categories from the denominator and
  * redistributing their weight proportionally across the remaining
- * categories — exactly the rule the checklist specifies. Done in our own
- * code rather than trusted to the LLM's arithmetic.
+ * categories -- exactly the rule the checklist specifies (Section 4). Done
+ * in our own code rather than trusted to the LLM's arithmetic.
  */
 export function computeContentQualityTotal(
   raw: { key: ContentQualityCategoryKey; score: number | null; justification: string }[],
@@ -282,26 +121,23 @@ export function computeContentQualityTotal(
   return { total, categories };
 }
 
-/** System prompt embedding the full rubric, sent once per scoring call. */
+let cachedChecklist: string | null = null;
+
+/**
+ * System prompt: the full checklist markdown, verbatim, unmodified -- per
+ * the user's explicit instruction to pass it "as it is... word by word."
+ * No extra instructions are appended here; the required JSON output shape
+ * is enforced separately by CONTENT_QUALITY_JSON_SCHEMA's own "strict" mode
+ * and its per-field "description" metadata below, not by prompt text.
+ */
 export function buildContentQualitySystemPrompt(): string {
-  const categoryBlocks = CONTENT_QUALITY_CATEGORIES.map(
-    (c) =>
-      `### ${c.label} (weight: ${Math.round(c.weight * 100)}%)\nCore question: ${c.coreQuestion}\nCriteria:\n${c.criteria
-        .map((crit) => `- ${crit}`)
-        .join("\n")}`,
-  ).join("\n\n");
-
-  return `You are an editorial quality analyst scoring a single newsletter edition against a fixed 12-category checklist. Score every applicable category from 0-5 (0 = Missing/Very Poor, 1 = Weak, 2 = Below Average, 3 = Good, 4 = Very Good, 5 = Exceptional). If a category genuinely does not apply to this edition's format, return null for its score and explain why in the justification — do not force a score.
-
-Evaluate ONLY the editorial content quality itself. Do not consider or infer anything about open rates, click rates, poll responses, unsubscribe rates, or any other engagement/performance metric — none of that is available to you and none of it is a valid signal of content quality per this framework.
-
-${categoryBlocks}
-
-For each category, give a 0-5 score (or null for N/A) and a one-to-two sentence justification grounded in the actual text. Then write one short overall narrative paragraph (2-3 sentences) summarizing the edition's editorial strengths and weaknesses.
-
-Finally, look back over the categories you just scored and pick the 1 or 2 with the most room for improvement (lowest score relative to weight, or a justification that flags a real weakness — skip this if every category is already strong). For each one, write one concrete, specific, actionable tip the editor could apply to the next edition, grounded in that category's own justification. Write it like real editorial feedback ("Cut the second paragraph's background and open with the number instead"), never a generic platitude ("Make it more engaging"). Return these as "tips" — an array of 1-2 short strings, or a single string acknowledging there's nothing significant to flag if every category already scored well.
-
-Style: do not use em dashes or en dashes anywhere in your justifications, narrative, or tips. Use periods, commas, or "and"/"but" instead.`;
+  if (cachedChecklist === null) {
+    cachedChecklist = readFileSync(
+      path.join(process.cwd(), "src/lib/scoring/global-content-analysis-checklist.md"),
+      "utf-8",
+    );
+  }
+  return cachedChecklist;
 }
 
 export const CONTENT_QUALITY_JSON_SCHEMA = {
@@ -313,6 +149,8 @@ export const CONTENT_QUALITY_JSON_SCHEMA = {
     properties: {
       categories: {
         type: "array",
+        description:
+          "One entry per category from Section 6 (Global Content Quality Score), scored per Section 7's detailed criteria.",
         items: {
           type: "object",
           additionalProperties: false,
@@ -321,7 +159,12 @@ export const CONTENT_QUALITY_JSON_SCHEMA = {
               type: "string",
               enum: CONTENT_QUALITY_CATEGORIES.map((c) => c.key),
             },
-            score: { type: ["integer", "null"], minimum: 0, maximum: 5 },
+            score: {
+              type: ["integer", "null"],
+              minimum: 0,
+              maximum: 5,
+              description: "0-5 per Section 6's scale, or null if this category is genuinely N/A for this edition.",
+            },
             justification: { type: "string" },
           },
           required: ["key", "score", "justification"],
@@ -329,14 +172,29 @@ export const CONTENT_QUALITY_JSON_SCHEMA = {
         minItems: CONTENT_QUALITY_CATEGORIES.length,
         maxItems: CONTENT_QUALITY_CATEGORIES.length,
       },
-      narrative: { type: "string" },
-      tips: {
-        type: "array",
-        items: { type: "string" },
-        minItems: 1,
-        maxItems: 2,
+      batch1: {
+        type: "object",
+        description:
+          "Section 17, Batch 1 -- Practitioners: Feedback. \"narrative\" is the Overall Feedback paragraph. \"tips\" are the highest-impact items from What We Need to Work On / What Should Be Added, written as concrete editorial actions, not generic platitudes.",
+        additionalProperties: false,
+        properties: {
+          narrative: { type: "string" },
+          tips: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 2 },
+        },
+        required: ["narrative", "tips"],
+      },
+      batch2: {
+        type: "object",
+        description:
+          "Section 17, Batch 2 -- Marketing & Growth Leadership: Feedback. Same structure as batch1, for the leadership audience.",
+        additionalProperties: false,
+        properties: {
+          narrative: { type: "string" },
+          tips: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 2 },
+        },
+        required: ["narrative", "tips"],
       },
     },
-    required: ["categories", "narrative", "tips"],
+    required: ["categories", "batch1", "batch2"],
   },
 } as const;

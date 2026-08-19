@@ -91,12 +91,22 @@ const { total, categories } = computeContentQualityTotal(RAW_SCORES);
 export const SAMPLE_CONTENT_QUALITY: StoredContentQualityScore = {
   total,
   categories,
-  narrative:
-    "This example edition would score well on voice, readability, and memorability thanks to a well-told, specific story, but would leave real points on the table in depth and actionability. It describes what happened clearly and entertainingly without pushing into why it matters more broadly or what a reader should do with that insight.",
-  tips: [
-    "Add one paragraph connecting the story to a broader pattern, so readers leave with a transferable idea rather than just an update.",
-    "Close on a specific, applicable takeaway for the reader instead of ending on the story detail alone.",
-  ],
+  batch1: {
+    narrative:
+      "For a practitioner reader, this example edition gives a clear, well-told update but stops short of a concrete next step. It would help someone stay current without necessarily giving them something new to try this week.",
+    tips: [
+      "Add one practical experiment or checklist item practitioners could test off the back of this story, not just the update itself.",
+      "Name one concrete resource or tool the reader could look into next, so the piece ends on an action rather than a fact.",
+    ],
+  },
+  batch2: {
+    narrative:
+      "For a leadership reader, this example edition explains what happened clearly but leaves the strategic implication implicit. It reads as informative rather than as a signal a leader should act on.",
+    tips: [
+      "Add one sentence on what this development means for budget, headcount, or vendor decisions, not just the news itself.",
+      "Connect the story to a broader industry pattern so leadership readers see it as a trend to track, not an isolated update.",
+    ],
+  },
   provider: "example",
   model: "Sample only, not yet scored",
   scoredAt: new Date(),

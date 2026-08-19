@@ -70,6 +70,8 @@ export async function POST() {
 
       const result = await scoreEditionContentQuality(edition.subject, content);
 
+      const batchFeedback = { batch1: result.batch1, batch2: result.batch2 };
+
       await db
         .insert(contentQualityScores)
         .values({
@@ -78,8 +80,7 @@ export async function POST() {
           model: result.model,
           total: result.total,
           categories: result.categories,
-          narrative: result.narrative,
-          tips: result.tips,
+          batchFeedback,
         })
         .onConflictDoUpdate({
           target: contentQualityScores.editionId,
@@ -88,8 +89,7 @@ export async function POST() {
             model: result.model,
             total: result.total,
             categories: result.categories,
-            narrative: result.narrative,
-            tips: result.tips,
+            batchFeedback,
             scoredAt: new Date(),
           },
         });

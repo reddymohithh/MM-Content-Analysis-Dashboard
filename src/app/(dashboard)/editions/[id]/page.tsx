@@ -8,7 +8,6 @@ import {
   canFlag,
 } from "@/lib/data/editions";
 import { computeQualityScore } from "@/lib/scoring/quality-score";
-import type { Audience } from "@/lib/scoring/insights";
 import { SAMPLE_CONTENT_QUALITY } from "@/lib/scoring/sample-content-quality";
 import { usDate } from "@/lib/format";
 import { StatCard, GradientStatCard, Card, Eyebrow, EmptyState } from "@/components/dashboard/ui";
@@ -36,8 +35,7 @@ export default async function EditionDetailPage({
 }) {
   const { id } = await params;
   const { audience: audienceParam } = await searchParams;
-  const audience: Audience =
-    audienceParam === "batch1" || audienceParam === "batch2" ? audienceParam : "blended";
+  const audience: "batch1" | "batch2" = audienceParam === "batch2" ? "batch2" : "batch1";
 
   const [edition, allEditions, contentQuality] = await Promise.all([
     getEditionById(id),
@@ -104,7 +102,10 @@ export default async function EditionDetailPage({
           <StatCard label="Open rate" value={`${edition.openRate}%`} />
           <StatCard label="CTR, overall" value={`${edition.ctrOverall}%`} />
           <StatCard label="Unsub rate" value={`${edition.unsubRate}%`} />
-          <GradientStatCard label="Engagement score" value={`${quality.total}%`} />
+          <GradientStatCard
+            label="Content quality score"
+            value={contentQuality ? `${contentQuality.total}%` : "N/A"}
+          />
         </div>
 
         <div className="rounded-xl border border-border bg-card p-4">
@@ -113,22 +114,22 @@ export default async function EditionDetailPage({
       </div>
 
       <Card className="mb-4">
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <div className="font-mono text-[11px] uppercase tracking-wide text-heading-soft">
-            Why this edition scored {quality.total}% engagement
-          </div>
-          <AudienceLensButtons />
+        <div className="mb-2 font-mono text-[11px] uppercase tracking-wide text-heading-soft">
+          Why this edition scored {quality.total}% engagement
         </div>
         <QualityDonuts result={quality} />
       </Card>
 
       <Card className="mb-4">
-        <div className="mb-3 font-mono text-[11px] uppercase tracking-wide text-heading-soft">
-          Content quality (editorial)
-          {contentQuality && <span className="ml-2 text-heading-soft">· {contentQuality.total}%</span>}
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="font-mono text-[11px] uppercase tracking-wide text-heading-soft">
+            Content quality (editorial)
+            {contentQuality && <span className="ml-2 text-heading-soft">· {contentQuality.total}%</span>}
+          </div>
+          <AudienceLensButtons />
         </div>
         {contentQuality ? (
-          <ContentQualityPanel result={contentQuality} />
+          <ContentQualityPanel result={contentQuality} audience={audience} />
         ) : (
           <div>
             <EmptyState>
@@ -138,7 +139,7 @@ export default async function EditionDetailPage({
             </EmptyState>
             <div className="mt-4 rounded-lg border-2 border-dashed border-orange/40 bg-card-soft p-4">
               <SampleBadge />
-              <ContentQualityPanel result={SAMPLE_CONTENT_QUALITY} />
+              <ContentQualityPanel result={SAMPLE_CONTENT_QUALITY} audience={audience} />
             </div>
           </div>
         )}
@@ -148,7 +149,7 @@ export default async function EditionDetailPage({
         <Eyebrow>Tips and suggestions</Eyebrow>
         {contentQuality ? (
           <ul className="list-disc space-y-1.5 pl-4 text-[13px] leading-relaxed">
-            {contentQuality.tips.map((tip, i) => (
+            {contentQuality[audience].tips.map((tip, i) => (
               <li key={i}>{tip}</li>
             ))}
           </ul>
@@ -161,7 +162,7 @@ export default async function EditionDetailPage({
             <div className="mt-4 rounded-lg border-2 border-dashed border-orange/40 bg-card p-4">
               <SampleBadge />
               <ul className="list-disc space-y-1.5 pl-4 text-[13px] leading-relaxed">
-                {SAMPLE_CONTENT_QUALITY.tips.map((tip, i) => (
+                {SAMPLE_CONTENT_QUALITY[audience].tips.map((tip, i) => (
                   <li key={i}>{tip}</li>
                 ))}
               </ul>

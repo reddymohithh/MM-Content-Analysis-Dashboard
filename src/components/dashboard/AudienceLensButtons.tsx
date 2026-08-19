@@ -3,7 +3,6 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 const LENSES = [
-  { value: "blended", label: "Blended" },
   { value: "batch1", label: "Batch 1" },
   { value: "batch2", label: "Batch 2" },
 ] as const;
@@ -12,7 +11,7 @@ export function AudienceLensButtons() {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const audience = searchParams.get("audience") ?? "blended";
+  const audience = searchParams.get("audience") ?? "batch1";
 
   function setAudience(value: string) {
     const params = new URLSearchParams(searchParams.toString());

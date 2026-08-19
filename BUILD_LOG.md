@@ -3208,3 +3208,108 @@ the 85%/100%/100% components in green, and the caption line no longer
 appears anywhere above the Content quality card's empty/sample state.
 Zero console errors. `npx tsc --noEmit`, `eslint`, and `next build` all
 clean.
+
+## Round 55: batch-specific content-quality feedback, new checklist passed verbatim
+
+Four changes, the last one a real rework of the LLM scoring pipeline.
+
+**UI moves**: relocated the Blended/Batch 1/Batch 2 toggle from "Why this
+edition scored X% engagement" into "Content quality (editorial)",
+dropping Blended entirely -- only Batch 1/Batch 2 remain
+(`AudienceLensButtons.tsx`, default now `batch1` instead of `blended`).
+Swapped the top-row stat box from the CTR/poll/retention/voice
+"Engagement score" to the real LLM "Content quality score"
+(`contentQuality.total`, honestly `N/A` until scored -- confirmed this
+was the intended reading rather than just relabeling the old number
+before touching any code, since shipping a relabeled-but-wrong number
+would be exactly the kind of misleading data this project has avoided
+all session). Removed the CTR-weighted narrative line
+("weighted mostly on engagement and retention...") from
+`QualityDonuts.tsx`.
+
+**The checklist swap**: the user supplied an updated 1115-line
+"Global Newsletter Content Analysis Checklist" and was explicit --
+"pass it as it is to the LLM, nothing changed, word by word." Saved it
+verbatim as `src/lib/scoring/global-content-analysis-checklist.md`
+(confirmed with a byte-for-byte `diff` against the uploaded file, not
+just a line count) and rewrote `buildContentQualitySystemPrompt()` to
+return that file's raw contents via `fs.readFileSync`, with nothing
+appended -- the previous version dynamically rebuilt rubric text from a
+JS array, which is exactly the kind of paraphrase the user said not to
+do. The 12 category keys/weights already matched the new checklist's
+Section 6/7 exactly (verified before touching anything), so
+`CONTENT_QUALITY_CATEGORIES` only lost its now-unused `coreQuestion`/
+`criteria` fields (the checklist itself carries that content now, and
+nothing read those fields anymore once the prompt stopped being built
+from them).
+
+Moving the Batch 1/Batch 2 toggle into the Content quality section only
+makes sense if something in that section actually changes when
+toggled, so before writing any code, asked which of two very
+differently-sized builds was wanted: swap audience-specific feedback
+text only (matching the checklist's Section 17, a moderate schema
+extension), or build the checklist's full separate scoring system
+(Section 8 audience-fit numbers, Section 9 reader-outcome scores,
+story-by-story tables, next-edition improvement plans -- a much larger
+UI). User chose the smaller, targeted build.
+
+`ContentQualityResult` dropped its flat `narrative`/`tips` fields in
+favor of `batch1: AudienceFeedback` and `batch2: AudienceFeedback`
+(each `{narrative, tips}`), sourced from Section 17's separate
+Practitioner/Leadership feedback rather than one generic summary. The
+12-category scores and weighted total stay a single shared assessment
+(Section 6's table isn't split by batch) -- only the narrative and tips
+switch with the toggle, in both the Content quality card and the Tips
+and suggestions card below it, via the same page-level `?audience=`
+param that already drove the engagement section's per-audience
+wording. The JSON Schema (not the prompt text) carries the field
+descriptions telling the model what each output field should contain,
+keeping the actual system prompt string 100% unmodified checklist,
+exactly as asked.
+
+Since the checklist system prompt intentionally carries no style
+instructions of its own now (previously the old prompt's final
+paragraph told the model not to use em/en dashes), added a
+post-response sanitization pass (`stripDashes()` in
+`score-content-quality.ts`) that normalizes any dash the model still
+produces before it's stored or rendered, rather than reintroducing our
+own instructions into what's supposed to be a pure, unmodified prompt.
+
+**Database**: `content_quality_scores` dropped `narrative`/`tips`,
+added a single `batch_feedback` jsonb column holding both batches.
+Table was still empty (confirmed by direct query, unsurprising --
+`OPENAI_API_KEY` is still blank, so this pipeline has never actually
+run), so the drop was safe. `drizzle-kit generate` hit the same
+rename-vs-create-column TTY prompt seen in earlier rounds; this time
+drove it through with `expect` (selecting "create column," which is
+what actually happened) instead of hand-applying raw DDL and skipping
+the migration file entirely -- gets a real, reviewable
+migration/snapshot/journal entry instead of a repo history gap.
+Confirmed `drizzle-kit push` reports "No changes detected" both before
+and after the migration file existed, proving the hand-applied DDL and
+the generated migration describe the identical end state.
+
+Updated the sample-preview data (`sample-content-quality.ts`, Round 53)
+to the new `batch1`/`batch2` shape too, with genuinely different,
+still edition-agnostic text per batch -- worth doing since the sample
+preview's whole purpose is showing what the real feature will look
+like, and the real feature's defining new behavior this round is that
+toggling batches changes something.
+
+**Verified in the browser**: restarted the dev server after the schema
+change (established convention), opened "Crocs Just Hired a 6-Foot
+Mascot," confirmed the stat box reads "Content quality score: N/A,"
+confirmed the engagement section has no toggle and no narrative line,
+confirmed "Content quality (editorial)" now has the Batch 1/Batch 2
+toggle showing sample data by default in Batch 1's voice. Clicked
+Batch 2 and confirmed both the engagement section's per-component "why"
+text and the Content quality sample narrative swapped to
+leadership-framed language, live, from the same toggle. Some stale
+"Cannot read properties of undefined" console errors showed up
+referencing a different edition than the one open, traced to the
+dev-server-restart timing (established pattern from earlier rounds,
+not a real bug) and confirmed clean with a fresh tab against both that
+specific edition and several other pages (`/editions`, `/overview`).
+`npx tsc --noEmit`, `eslint`, and `next build` all clean. Full
+end-to-end verification against `gpt-5.6-luna` is still pending the
+real `OPENAI_API_KEY`.
