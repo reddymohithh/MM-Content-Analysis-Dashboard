@@ -1,4 +1,9 @@
-import { getAllEditions, getPublicationSnapshot, trailingAverages } from "@/lib/data/editions";
+import {
+  getAllEditions,
+  getPublicationSnapshot,
+  getContentQualityTotals,
+  trailingAverages,
+} from "@/lib/data/editions";
 import { computeQualityScore } from "@/lib/scoring/quality-score";
 import {
   generateOpenRateTips,
@@ -16,11 +21,19 @@ import { OverviewChart } from "@/components/dashboard/OverviewChart";
 export const dynamic = "force-dynamic";
 
 export default async function OverviewPage() {
-  const [editions, publication] = await Promise.all([
+  const [editions, publication, contentQualityTotals] = await Promise.all([
     getAllEditions(),
     getPublicationSnapshot(),
+    getContentQualityTotals(),
   ]);
   const { avgCtr, avgUnsub } = trailingAverages(editions);
+
+  const scoredTotals = editions
+    .map((e) => contentQualityTotals.get(e.id))
+    .filter((t): t is number => t !== undefined);
+  const avgContentQuality = scoredTotals.length
+    ? Math.round(scoredTotals.reduce((s, t) => s + t, 0) / scoredTotals.length)
+    : null;
 
   const scored = editions.map((e) => ({
     edition: e,
@@ -35,9 +48,6 @@ export default async function OverviewPage() {
     }),
   }));
 
-  const avgQuality = scored.length
-    ? Math.round(scored.reduce((s, x) => s + x.quality.total, 0) / scored.length)
-    : 0;
   const avgOpenRate = editions.length
     ? Math.round((editions.reduce((s, e) => s + e.openRate, 0) / editions.length) * 100) / 100
     : 0;
@@ -70,7 +80,17 @@ export default async function OverviewPage() {
         <StatCard label="Subscribers" value={publication.activeSubscribers.toLocaleString()} />
         <StatCard label="Open rate" value={`${avgOpenRate}%`} />
         <StatCard label="CTR, overall" value={`${Math.round(avgCtr * 100) / 100}%`} />
-        <GradientStatCard label="Content quality" value={`${avgQuality}%`} />
+        <GradientStatCard
+          label="Content quality"
+          value={avgContentQuality !== null ? `${avgContentQuality}%` : "N/A"}
+          sub={
+            scoredTotals.length > 0 && scoredTotals.length < editions.length
+              ? `${scoredTotals.length} of ${editions.length} scored`
+              : scoredTotals.length === 0
+                ? "No editions scored yet"
+                : undefined
+          }
+        />
       </div>
 
       <div className="mb-4">

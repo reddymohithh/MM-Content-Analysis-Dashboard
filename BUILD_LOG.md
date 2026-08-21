@@ -3478,3 +3478,48 @@ batch is selected, which is correct -- neither Section 7.1 nor Section
 22 is toggle-scoped in the checklist, both are always-both-audiences by
 design. Zero console errors. `npx tsc --noEmit`, `eslint`, and
 `next build` all clean.
+
+## Round 58: Overview page's "Content quality" box was the same mislabeling bug
+
+Asked about the four Overview page cards ("Tips for improving open
+rate/CTR", "Batch 1: practitioners", "Batch 2: leadership"). Checked
+the actual code rather than assume: all four are still `insights.ts`'s
+original rule-based heuristics (CTR/open-rate trend and hook-type
+averages), untouched by any of this session's checklist work. Explained
+why the two Tips cards are legitimately separate rather than a gap --
+the checklist's own Section 14 says performance metrics must be
+analyzed apart from content quality, so an engagement-based heuristic
+there isn't wrong, it's what the checklist itself asks for. The two
+Batch cards don't map cleanly onto Section 17 either, since they're a
+trailing-window aggregate across many editions and the checklist's
+audience feedback is scoped to one edition at a time -- there's no
+window-level version of it to point at.
+
+While checking, found the same mislabeling bug already fixed once on
+the edition detail page (Round 55): the top stat box here is labeled
+"Content quality" but was showing `avgQuality`, the average of the old
+engagement-metric score (`computeQualityScore().total` -- CTR/poll/
+retention/voice), not anything from the checklist. Asked what to do
+with all of this as a multi-select rather than bundling a decision;
+user picked only the stat-box fix.
+
+Added `getContentQualityTotals()` to `src/lib/data/editions.ts` -- a
+lean `editionId -> total` map (just the two columns, not the full
+`analysis`/`categories` jsonb) so computing an average doesn't pull
+down every scored edition's full story-by-story/feedback payload for a
+single number. Overview now averages only over editions that actually
+have a `content_quality_scores` row, shows honest `N/A` when none do
+(still true right now -- `OPENAI_API_KEY` is still blank), and a `sub`
+caption ("X of Y scored") whenever coverage is partial, so the number
+never silently pretends to represent editions it doesn't. Removed the
+now-unused engagement-based `avgQuality` variable entirely rather than
+leave it dangling.
+
+**Verified in the browser**: opened `/overview` and confirmed the
+stat box reads "N/A / No editions scored yet" instead of a plausible-
+looking percentage that wasn't actually a content-quality number,
+confirmed the two Tips cards and two Batch cards render unchanged.
+Zero console errors on `/overview` and `/editions`. `npx tsc --noEmit`,
+`eslint`, and `next build` all clean. The partial-coverage caption path
+("X of Y scored") is implemented but unverified live, since there's no
+way to get a real partial-scored state without the actual API key.

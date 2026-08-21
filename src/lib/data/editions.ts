@@ -257,6 +257,24 @@ export async function getContentQualityScore(
   };
 }
 
+/** Lean lookup for Overview's "Content quality" stat box: just the
+ * editionId -> total map, not the full analysis, since averaging is all
+ * that's needed there. Only includes editions that have actually been
+ * scored — callers decide how to handle partial coverage rather than this
+ * function silently padding with zeros. */
+export async function getContentQualityTotals(): Promise<Map<string, number>> {
+  if (!USE_DB) return new Map();
+
+  const { db } = await import("@/lib/db");
+  const { contentQualityScores } = await import("@/lib/db/schema");
+
+  const rows = await db
+    .select({ editionId: contentQualityScores.editionId, total: contentQualityScores.total })
+    .from(contentQualityScores);
+
+  return new Map(rows.map((r) => [r.editionId, r.total]));
+}
+
 export function trailingAverages(editions: Edition[]) {
   const withCtr = editions.filter((e) => typeof e.ctrOverall === "number");
   const avgCtr = withCtr.length
