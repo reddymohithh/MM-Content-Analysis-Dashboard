@@ -3523,3 +3523,41 @@ Zero console errors on `/overview` and `/editions`. `npx tsc --noEmit`,
 `eslint`, and `next build` all clean. The partial-coverage caption path
 ("X of Y scored") is implemented but unverified live, since there's no
 way to get a real partial-scored state without the actual API key.
+
+## Round 59: Admin dropdown replaces Log out + the Ads toggle
+
+Replaced the standalone "Log out" button with an "Admin" dropdown
+(new `AdminMenu.tsx`, same click-outside-to-close pattern as the
+existing `SingleSelectDropdown.tsx`): Content -> `/overview`, Meta Ads
+-> `/ads`, SparkLoop, Log out. Removed the separate "Ads"/"Content"
+section-toggle link entirely, since cross-section navigation now lives
+in the one dropdown instead.
+
+SparkLoop has no real dashboard to link to -- checked, not assumed:
+`grep`ing the whole `src/` tree turns up nothing, and BUILD_LOG's own
+Round 33/34 entries record why (SparkLoop's v3 API access was
+requested and never granted, so the feature was deferred). Rather than
+link to a page that doesn't exist or silently drop the item the user
+asked for, it renders as a disabled row with an honest "Coming soon"
+label -- same "don't fabricate, show the real state" pattern used for
+every other not-yet-available feature this session.
+
+Also answered a scoping question before any API key changed hands:
+grepped the whole codebase for every file touching OpenAI
+(`getConfiguredLlmProvider`, `completeStructured`, `OpenAI(`) and
+confirmed there's exactly one call site -- `scoreEditionContentQuality()`,
+triggered only by the "Analyze content" button, only for editions
+without an existing `content_quality_scores` row. Cross-checked for
+any other AI SDK usage (Anthropic, `@ai-sdk`, etc.) and confirmed
+`package.json` only has the one `openai` dependency; a stray grep hit
+in `subject-line.ts` turned out to be the literal string "anthropic" in
+a brand-name detection list, not a real call.
+
+**Verified in the browser**: opened the dropdown on `/overview`,
+confirmed all four rows render with SparkLoop visibly disabled and
+"Coming soon" labeled, clicked "Meta Ads" and confirmed real
+navigation to `/ads` with the same dropdown present there too (shared
+component, both sections). Confirmed the login page's inert navbar
+shows "Admin" instead of the old "Ads" placeholder. Zero console
+errors on `/overview`, `/ads`, and `/ads/mapping`. `npx tsc --noEmit`,
+`eslint`, and `next build` all clean.

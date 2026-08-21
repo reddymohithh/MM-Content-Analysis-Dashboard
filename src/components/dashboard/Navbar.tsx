@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NavTriggerButton } from "./NavTriggerButton";
+import { AdminMenu } from "./AdminMenu";
 
 const TABS = [
   { href: "/overview", label: "Overview" },
@@ -20,14 +21,12 @@ const ADS_TABS = [
 const inertTriggerButtonClasses =
   "flex flex-shrink-0 cursor-not-allowed items-center gap-1.5 whitespace-nowrap rounded-lg border border-text-faint/40 px-3 py-1.5 text-[12px] font-medium text-text-faint/40";
 
-const sectionToggleClasses =
-  "flex flex-shrink-0 items-center whitespace-nowrap rounded-lg border border-text-faint/40 px-3 py-1.5 text-[12px] font-medium text-text-faint no-underline transition-colors hover:text-cream";
-
 /**
  * One shared navbar for both the content and ads dashboards — same brand,
  * same shell, same auth control. `section` only changes which content-
- * dashboard-specific tabs/buttons show and which section the "Content" /
- * "Ads" toggle switches to; it isn't a different component per section.
+ * dashboard-specific tabs/buttons show; it isn't a different component per
+ * section. Cross-section navigation (Content / Meta Ads / SparkLoop) lives
+ * in the Admin dropdown (AdminMenu.tsx), not a standalone toggle link.
  *
  * `disabled` renders this navbar on /login — so the app doesn't look
  * broken behind the login card — but every control in it is inert: no
@@ -99,7 +98,7 @@ export function Navbar({
         {disabled ? (
           <>
             <span className="whitespace-nowrap rounded-lg px-3 py-1.5 text-[12px] font-medium text-text-faint/40">
-              Ads
+              Admin
             </span>
             <button type="button" disabled className={inertTriggerButtonClasses}>
               <span className="inline-block">↻</span>
@@ -165,19 +164,7 @@ export function Navbar({
                 }}
               />
             )}
-            <Link href={section === "content" ? "/ads" : "/overview"} className={sectionToggleClasses}>
-              {section === "content" ? "Ads" : "Content"}
-            </Link>
-            {authButton === "logout" && (
-              <form action="/api/site-auth/logout" method="POST">
-                <button
-                  type="submit"
-                  className="flex flex-shrink-0 items-center whitespace-nowrap rounded-lg border border-text-faint/40 px-3 py-1.5 text-[12px] font-medium text-text-faint transition-colors hover:text-cream"
-                >
-                  Log out
-                </button>
-              </form>
-            )}
+            {authButton === "logout" && <AdminMenu />}
             {authButton === "login" && (
               <Link
                 href="/login"
