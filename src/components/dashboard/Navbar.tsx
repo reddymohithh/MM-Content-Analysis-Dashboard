@@ -117,7 +117,7 @@ export function Navbar({
                   idleLabel="Fetch"
                   runningLabel="Fetching…"
                   endpoint="/api/beehiiv/refresh"
-                  title="Pull every confirmed edition from Beehiiv, including web URLs"
+                  title="Pull every confirmed edition from Beehiiv since July 1, 2026, including web URLs"
                   formatResult={(data) =>
                     `Synced ${data.synced} edition${data.synced === 1 ? "" : "s"}${
                       typeof data.removed === "number" && data.removed > 0

@@ -3,7 +3,7 @@
  * (scripts/seed-from-beehiiv.ts) and the navbar "Fetch" button's API route
  * (src/app/api/beehiiv/refresh/route.ts) — one implementation, two triggers.
  */
-import { and, eq, notInArray } from "drizzle-orm";
+import { and, eq, gte, notInArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   editions,
@@ -26,6 +26,12 @@ import {
   subjectHasEmoji,
   subjectHasNumber,
 } from "@/lib/scoring/subject-line";
+
+// Editions before this date are never pulled in, so the DB (and therefore
+// what "Analyze content" can ever score) stays bounded — analyzing every
+// edition costs real OpenAI money per edition, and the newsletter's full
+// archive would otherwise keep growing that exposure indefinitely.
+const SYNC_START_DATE = new Date("2026-07-01T00:00:00Z");
 
 function subjectLineOf(post: BeehiivPost): string {
   // PROJECT_SPEC.md: pull the real sent subject line, which can differ from
@@ -77,11 +83,11 @@ export async function syncBeehiivData(): Promise<BeehiivSyncResult> {
     });
   }
 
-  // Paginate through every confirmed post rather than a trailing-days
-  // window — the "Fetch" button is meant to bring the DB fully in sync
-  // with Beehiiv on every click, not just catch the last month, so an
-  // edition's web_url (or any other field) never goes stale just because
-  // it's more than 30 days old.
+  // Paginate through every confirmed post back to SYNC_START_DATE (not just
+  // a trailing-days window), so a field like web_url never goes stale just
+  // because it's a few weeks old. Posts come back newest-first, so once a
+  // page's oldest post is before the cutoff, every later page would be too
+  // — stop paginating there instead of walking the entire archive.
   const allPosts: BeehiivPost[] = [];
   for (let page = 1; ; page += 1) {
     const postsRes = await listPosts(publicationId, {
@@ -92,8 +98,11 @@ export async function syncBeehiivData(): Promise<BeehiivSyncResult> {
       direction: "desc",
       expand: ["stats"],
     });
-    allPosts.push(...postsRes.data);
-    if (!postsRes.has_more || postsRes.data.length === 0) break;
+    if (postsRes.data.length === 0) break;
+    allPosts.push(...postsRes.data.filter((p) => (p.publish_date ?? 0) * 1000 >= SYNC_START_DATE.getTime()));
+    const oldestOnPage = postsRes.data[postsRes.data.length - 1];
+    const pastCutoff = (oldestOnPage.publish_date ?? 0) * 1000 < SYNC_START_DATE.getTime();
+    if (pastCutoff || !postsRes.has_more) break;
   }
   // Only editions sent on both email and web count as a real edition here —
   // web-only posts have no email stats (open rate is meaningless for them,
@@ -243,21 +252,27 @@ export async function syncBeehiivData(): Promise<BeehiivSyncResult> {
     synced += 1;
   }
 
-  // Clean up editions previously synced that no longer belong (e.g. a post
-  // that used to be "both" and got pulled from web, or was unconfirmed).
-  // Since every confirmed post is fetched above, this now compares against
-  // the full set rather than just a recent window.
+  // Clean up editions previously synced into the tracked window that no
+  // longer belong (e.g. a post that used to be "both" and got pulled from
+  // web, or was unconfirmed) — scoped to SYNC_START_DATE onward so this
+  // never touches anything outside the window this sync actually covers.
   const keepIds = recentPosts.map((p) => p.id);
   const staleCondition =
     keepIds.length > 0
-      ? and(eq(editions.dataSource, "beehiiv_live"), notInArray(editions.id, keepIds))
-      : eq(editions.dataSource, "beehiiv_live");
+      ? and(
+          eq(editions.dataSource, "beehiiv_live"),
+          gte(editions.publishedAt, SYNC_START_DATE),
+          notInArray(editions.id, keepIds),
+        )
+      : and(eq(editions.dataSource, "beehiiv_live"), gte(editions.publishedAt, SYNC_START_DATE));
   const removedRows = await db.delete(editions).where(staleCondition).returning({ id: editions.id });
   if (removedRows.length > 0) {
     log(`Removed ${removedRows.length} stale edition(s) no longer confirmed/dual-platform on Beehiiv.`);
   }
 
-  log(`Done. Synced ${synced} of ${allPosts.length} confirmed dual-platform editions.`);
+  log(
+    `Done. Synced ${synced} of ${allPosts.length} confirmed dual-platform editions since ${SYNC_START_DATE.toISOString().slice(0, 10)}.`,
+  );
 
   return { synced, removed: removedRows.length, skippedForPlatform, messages };
 }

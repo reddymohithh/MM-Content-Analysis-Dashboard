@@ -5,9 +5,12 @@ export const maxDuration = 300;
 
 /**
  * Manually-triggered by the navbar "Fetch" button — pulls every confirmed,
- * dual-platform edition from Beehiiv into whatever DATABASE_URL currently
- * points to, so a click always brings the DB fully in sync (not just recent
- * editions). Deliberately separate from content-quality scoring (a
+ * dual-platform edition since SYNC_START_DATE (see lib/beehiiv/sync.ts) from
+ * Beehiiv into whatever DATABASE_URL currently points to, so a click always
+ * brings that window fully in sync, not just the last 30 days. The start
+ * date is a deliberate cap, not a full-history pull, since every edition
+ * fetched here is also one "Analyze content" could later spend real OpenAI
+ * money scoring. Deliberately separate from content-quality scoring (a
  * different button, a different route): fetching new edition data and
  * analyzing it with an LLM are two distinct actions with two distinct
  * costs, and the user asked for them to stay that way rather than be
