@@ -4,12 +4,14 @@ import { syncBeehiivData } from "@/lib/beehiiv/sync";
 export const maxDuration = 300;
 
 /**
- * Manually-triggered by the navbar "Fetch" button — pulls the trailing
- * 30-day window from Beehiiv into whatever DATABASE_URL currently points
- * to. Deliberately separate from content-quality scoring (a different
- * button, a different route): fetching new edition data and analyzing it
- * with an LLM are two distinct actions with two distinct costs, and the
- * user asked for them to stay that way rather than be combined.
+ * Manually-triggered by the navbar "Fetch" button — pulls every confirmed,
+ * dual-platform edition from Beehiiv into whatever DATABASE_URL currently
+ * points to, so a click always brings the DB fully in sync (not just recent
+ * editions). Deliberately separate from content-quality scoring (a
+ * different button, a different route): fetching new edition data and
+ * analyzing it with an LLM are two distinct actions with two distinct
+ * costs, and the user asked for them to stay that way rather than be
+ * combined.
  */
 export async function POST() {
   if (!process.env.DATABASE_URL) {

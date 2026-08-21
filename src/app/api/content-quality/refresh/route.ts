@@ -17,8 +17,8 @@ export const maxDuration = 300;
  * edition's plain-text content first if it isn't already cached.
  *
  * Requires BEEHIIV_API_KEY (to fetch content) and OPENAI_API_KEY (to score
- * it) — both local-only secrets, so this route is a no-op-by-design on the
- * public deployment, which has neither.
+ * it) to be set wherever this runs — returns a clear 400 instead of running
+ * partially if either is missing.
  */
 export async function POST() {
   if (!process.env.DATABASE_URL) {

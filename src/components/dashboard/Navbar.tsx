@@ -117,7 +117,7 @@ export function Navbar({
                   idleLabel="Fetch"
                   runningLabel="Fetching…"
                   endpoint="/api/beehiiv/refresh"
-                  title="Pull the trailing 30 days of editions from Beehiiv (requires local API key)"
+                  title="Pull every confirmed edition from Beehiiv, including web URLs"
                   formatResult={(data) =>
                     `Synced ${data.synced} edition${data.synced === 1 ? "" : "s"}${
                       typeof data.removed === "number" && data.removed > 0
@@ -130,7 +130,7 @@ export function Navbar({
                   idleLabel="Analyze content"
                   runningLabel="Analyzing…"
                   endpoint="/api/content-quality/refresh"
-                  title="Score new editions for editorial content quality (requires local API keys)"
+                  title="Score every unanalyzed edition for editorial content quality"
                   formatResult={(data) =>
                     typeof data.scored === "number" && data.scored > 0
                       ? `Scored ${data.scored} edition${data.scored === 1 ? "" : "s"}${
